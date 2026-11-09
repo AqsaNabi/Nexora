@@ -21,21 +21,31 @@ class ChatService:
         self.job_post_approved = False
         self.application_form_approved = False
 
+        self.approved_payload = None
+        self.approved_json_path = None
 
     def process_message(self, user_message):
 
+        # Reset previous approval status for new drafts
         self.job_post_approved = False
         self.application_form_approved = False
+
+        self.approved_payload = None
+        self.approved_json_path = None
 
         self.conversation.append({
             "role": "user",
             "content": user_message
         })
 
-        ai_response = generate_ai_response(self.conversation)
+        ai_response = generate_ai_response(
+            self.conversation
+        )
 
         if ai_response.get("action") != "draft":
-            raise ValueError("AI did not generate both drafts.")
+            raise ValueError(
+                "AI did not generate both drafts."
+            )
 
         job_post = prepare_job_post(
             ai_response.get("job_post", {})
@@ -55,13 +65,15 @@ class ChatService:
 
         return {
             "type": "draft",
-            "message": "Your job post and application form are ready for review.",
+            "message": (
+                "Your job post and application form "
+                "are ready for review."
+            ),
             "job_post": job_post,
             "application_form": application_form,
             "job_post_approved": False,
             "application_form_approved": False
         }
-
 
     def reset(self):
 
@@ -72,3 +84,6 @@ class ChatService:
 
         self.job_post_approved = False
         self.application_form_approved = False
+
+        self.approved_payload = None
+        self.approved_json_path = None

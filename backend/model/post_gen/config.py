@@ -9,17 +9,12 @@ ENV_PATH = BASE_DIR / ".env"
 
 load_dotenv(dotenv_path=ENV_PATH, override=True)
 
-OLLAMA_API_KEY = os.getenv("OLLAMA_API_KEY")
+OLLAMA_API_KEY ="c63a8923d89e453d9d0184e974cad9d4.2MLgKToqBZ8dyiI2gKFMpyKj"
 
-OLLAMA_API_URL = os.getenv(
-    "OLLAMA_API_URL",
-    "https://ollama.com/v1"
-)
+OLLAMA_API_URL = "https://ollama.com/v1"
+    
 
-OLLAMA_MODEL = os.getenv(
-    "OLLAMA_MODEL",
-    "gemma4:31b-cloud"
-)
+OLLAMA_MODEL ="gemma4:31b-cloud"
 
 if not OLLAMA_API_KEY:
     raise ValueError("OLLAMA_API_KEY is missing from post_gen/.env")
