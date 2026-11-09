@@ -22,7 +22,7 @@ from database.concect import cur, conn
 sender_email = "salifsajad1@gmail.com"
 
 # Use your NEW Google App Password
-sender_password = "dfbo rnfz mxxc zzfr"
+sender_password = "dfbo rnfz mxxc"
 
 smtp_server = "smtp.gmail.com"
 
