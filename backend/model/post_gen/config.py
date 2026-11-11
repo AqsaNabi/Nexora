@@ -3,18 +3,54 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
-# Locate .env inside the post_gen folder
-BASE_DIR = Path(__file__).resolve().parent
-ENV_PATH = BASE_DIR / ".env"
 
-load_dotenv(dotenv_path=ENV_PATH, override=True)
+# ============================================================
+# ENVIRONMENT CONFIGURATION
+# ============================================================
 
-OLLAMA_API_KEY ="c63a8923d89e453d9d0184e974cad9d4.2MLgKToqBZ8dyiI2gKFMpyKj"
+POST_GEN_FOLDER = Path(__file__).resolve().parent
 
-OLLAMA_API_URL = "https://ollama.com/v1"
-    
+ENV_FILE = POST_GEN_FOLDER / ".env"
 
-OLLAMA_MODEL ="gemma4:31b-cloud"
+load_dotenv(ENV_FILE, override=True)
 
-if not OLLAMA_API_KEY:
-    raise ValueError("OLLAMA_API_KEY is missing from post_gen/.env")
+
+# ============================================================
+# AWS BEDROCK CONFIGURATION
+# ============================================================
+
+BEDROCK_API_KEY = os.getenv("BEDROCK_API_KEY")
+
+BEDROCK_BASE_URL = os.getenv(
+    "BEDROCK_BASE_URL",
+    "https://bedrock-mantle.us-east-1.api.aws/v1"
+)
+
+BEDROCK_MODEL = os.getenv(
+    "BEDROCK_MODEL",
+    "openai.gpt-oss-20b"
+)
+
+
+# ============================================================
+# VALIDATE CONFIGURATION
+# ============================================================
+
+if not BEDROCK_API_KEY:
+
+    raise ValueError(
+        f"BEDROCK_API_KEY is missing. "
+        f"Please check your environment file: {ENV_FILE}"
+    )
+
+if not BEDROCK_BASE_URL:
+
+    raise ValueError(
+        "BEDROCK_BASE_URL is missing."
+    )
+
+if not BEDROCK_MODEL:
+
+    raise ValueError(
+        "BEDROCK_MODEL is missing."
+    )
