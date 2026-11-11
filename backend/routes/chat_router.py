@@ -9,6 +9,8 @@ from backend.services.job_post_service import (
     prepare_application_form
 )
 
+from backend.services.google_form_service import create_google_form
+
 
 router = APIRouter()
 
@@ -29,6 +31,74 @@ async def chat_websocket(websocket: WebSocket, session_id: str):
         "type": "connected",
         "message": "WebSocket connected successfully."
     })
+
+    # ----------------------------------------
+    # CREATE GOOGLE FORM AFTER BOTH APPROVALS
+    # ----------------------------------------
+
+    async def create_form_if_approved():
+
+        if not (
+            chat_service.job_post_approved
+            and chat_service.application_form_approved
+        ):
+            return
+
+        # Prevent duplicate form creation
+        if chat_service.created_form_id:
+            return
+
+        if chat_service.form_creation_in_progress:
+            return
+
+        chat_service.form_creation_in_progress = True
+
+        try:
+
+            job_post = chat_service.current_job_post
+            application_form = chat_service.current_application_form
+
+            form_title = application_form.get("form_title", "").strip()
+
+            if not form_title:
+                job_title = job_post.get("job_title", "").strip()
+
+                form_title = (
+                    f"{job_title} - Job Application - Nexora"
+                    if job_title
+                    else "Nexora Job Application Form"
+                )
+
+            result = await run_in_threadpool(
+                create_google_form,
+                form_title,
+                application_form.get("questions", [])
+            )
+
+            chat_service.created_form_id = result["form_id"]
+            chat_service.created_form_url = result["form_url"]
+
+            await websocket.send_json({
+                "type": "form_created",
+                "message": "Google Form created successfully!",
+                "form_id": result["form_id"],
+                "title": result["title"],
+                "form_url": result["form_url"]
+            })
+
+        except Exception as error:
+
+            chat_service.form_creation_in_progress = False
+
+            await websocket.send_json({
+                "type": "error",
+                "message": f"Google Form creation failed: {str(error)}"
+            })
+
+        else:
+
+            chat_service.form_creation_in_progress = False
+
 
     try:
 
@@ -84,6 +154,11 @@ async def chat_websocket(websocket: WebSocket, session_id: str):
                     chat_service.job_post_approved = False
                     chat_service.application_form_approved = False
 
+                    # Reset previous form tracking
+                    chat_service.created_form_id = None
+                    chat_service.created_form_url = None
+                    chat_service.form_creation_in_progress = False
+
                     await websocket.send_json({
                         "type": "drafts_updated",
                         "message": "Both edited drafts saved successfully."
@@ -117,9 +192,12 @@ async def chat_websocket(websocket: WebSocket, session_id: str):
                 await websocket.send_json({
                     "type": "approval",
                     "job_post_approved": True,
-                    "application_form_approved": chat_service.application_form_approved,
+                    "application_form_approved":
+                        chat_service.application_form_approved,
                     "message": "Job post approved successfully."
                 })
+
+                await create_form_if_approved()
 
 
             # ----------------------------------------
@@ -141,10 +219,13 @@ async def chat_websocket(websocket: WebSocket, session_id: str):
 
                 await websocket.send_json({
                     "type": "approval",
-                    "job_post_approved": chat_service.job_post_approved,
+                    "job_post_approved":
+                        chat_service.job_post_approved,
                     "application_form_approved": True,
                     "message": "Application questions approved successfully."
                 })
+
+                await create_form_if_approved()
 
 
             # ----------------------------------------
