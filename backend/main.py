@@ -4,6 +4,7 @@ from routes.register import router as register_router
 from routes.details import router as details_router
 from routes.announcements import router as announcements_router
 from fastapi.middleware.cors import CORSMiddleware
+from routes.auth_routes import router as auth_router
 app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
