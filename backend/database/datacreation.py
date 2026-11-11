@@ -1,4 +1,4 @@
-from backend.database.concect import cur ,conn  
+from concect import cur ,conn  
 q="""CREATE TABLE IF NOT EXISTS register(
     employee_id       VARCHAR(100) ,
     full_name         VARCHAR(100),
@@ -13,7 +13,23 @@ q="""CREATE TABLE IF NOT EXISTS register(
 )"""
 
 cur.execute(q)
-print("Table created successfully")
+print(" Register Table created successfully")
 
 
+conn.commit()
+q="""CREATE TABLE IF NOT EXISTS announcements (
+ 
+    announcement_id SERIAL PRIMARY KEY,
+ 
+    designation VARCHAR(50) NOT NULL,
+ 
+    title VARCHAR(200) NOT NULL,
+ 
+    content TEXT NOT NULL,
+ 
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+ 
+)"""
+cur.execute(q)
+print("Announcemet Table created successfully")
 conn.commit()
