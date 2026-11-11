@@ -21,11 +21,21 @@ class ChatService:
         self.job_post_approved = False
         self.application_form_approved = False
 
+        # Google Form tracking
+        self.created_form_id = None
+        self.created_form_url = None
+        self.form_creation_in_progress = False
+
 
     def process_message(self, user_message):
 
         self.job_post_approved = False
         self.application_form_approved = False
+
+        # Reset previous Google Form tracking for new drafts
+        self.created_form_id = None
+        self.created_form_url = None
+        self.form_creation_in_progress = False
 
         self.conversation.append({
             "role": "user",
@@ -72,3 +82,8 @@ class ChatService:
 
         self.job_post_approved = False
         self.application_form_approved = False
+
+        # Reset Google Form tracking
+        self.created_form_id = None
+        self.created_form_url = None
+        self.form_creation_in_progress = False
