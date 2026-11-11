@@ -1,7 +1,21 @@
 import json
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import (
+    APIRouter,
+    WebSocket,
+    WebSocketDisconnect,
+    Depends
+)
+from backend.authen.auth import (
+    verify_token,
+    SECRET_KEY,
+    ALGORITHM
+)
+
 from starlette.concurrency import run_in_threadpool
+from jose import jwt, JWTError
+
+
 
 from backend.services.chat_service import ChatService
 
@@ -17,6 +31,7 @@ from backend.model.post_gen.approved_payload_service import (
 
 router = APIRouter()
 
+
 # Active conversations are stored in memory only.
 active_sessions = {}
 
@@ -24,6 +39,31 @@ active_sessions = {}
 @router.websocket("/ws/chat/{session_id}")
 async def chat_websocket(websocket: WebSocket, session_id: str):
 
+    # ------------------------------------------
+    # WEBSOCKET AUTHENTICATION
+    # ------------------------------------------
+
+    token = websocket.query_params.get("token")
+
+    if not token:
+
+        await websocket.close(code=1008)
+        return
+
+    try:
+
+        jwt.decode(
+            token,
+            SECRET_KEY,
+            algorithms=[ALGORITHM]
+        )
+
+    except JWTError:
+
+        await websocket.close(code=1008)
+        return
+
+    # Accept connection only after authentication.
     await websocket.accept()
 
     if session_id not in active_sessions:

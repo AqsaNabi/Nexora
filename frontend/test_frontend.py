@@ -5,6 +5,19 @@ import uuid
 import streamlit as st
 import websocket
 
+from api import api_request
+import os
+import sys
+
+PROJECT_ROOT = os.path.dirname(
+    os.path.dirname(os.path.abspath(__file__))
+)
+
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+from backend.authen.auth import create_token
+
+
 
 # ============================================================
 # CONFIGURATION
@@ -13,17 +26,7 @@ import websocket
 BACKEND_URL = "http://127.0.0.1:8000"
 WEBSOCKET_URL = "ws://127.0.0.1:8000/ws/chat"
 
-
-# ============================================================
-# PAGE CONFIGURATION
-# ============================================================
-
-st.set_page_config(
-    page_title="Job Post Link",
-    page_icon="💼",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+REQUEST_TIMEOUT = 600
 
 
 # ============================================================
@@ -280,14 +283,30 @@ def send_websocket_event(event):
 
     try:
 
+        # Get the existing JWT token from main Nexora login.
+        token = st.session_state.get("token")
+
+        if not token:
+
+            st.error(
+                "Authentication token not found. Please log in."
+            )
+
+            return None
+
+        # Get the current conversation session ID.
+        session_id = st.session_state.session_id
+
+        # The current backend expects the token in query parameters.
         ws_url = (
-            f"{WEBSOCKET_URL}/"
-            f"{st.session_state.session_id}"
+            f"{WEBSOCKET_URL}/{session_id}"
+            f"?token={token}"
         )
 
+        # Establish authenticated WebSocket connection.
         ws = websocket.create_connection(
             ws_url,
-            timeout=600
+            timeout=REQUEST_TIMEOUT
         )
 
         connection_message = json.loads(ws.recv())
@@ -301,8 +320,10 @@ def send_websocket_event(event):
                 )
             )
 
+        # Send event to backend.
         ws.send(json.dumps(event))
 
+        # Receive backend response.
         response = json.loads(ws.recv())
 
         return response
@@ -871,9 +892,17 @@ def display_review_section():
 
 def job_post_generator():
 
+   
+
     initialize_session_state()
 
+    # Temporary token for independent testing
+    if not st.session_state.get("token"):
+        st.session_state.token = create_token("test@example.com")
+
     apply_styling()
+
+    
 
     # LEFT SIDEBAR
     display_sidebar()
@@ -933,8 +962,5 @@ def job_post_generator():
             send_message(user_message)
 
 
-# ============================================================
-# RUN APPLICATION
-# ============================================================
-
-job_post_generator()
+if __name__ == "__main__":
+    job_post_generator()
