@@ -1,7 +1,7 @@
 
 import json
 
-from database.recruitment_db import get_recruitment_connection
+from backend.database.recruitment_db import get_recruitment_connection
 
 
 def create_recruitment_post(job_description):
@@ -42,14 +42,17 @@ def create_recruitment_post(job_description):
             connection.close()
 
 
+
 def save_recruitment_metadata(
     post_id,
     form_id=None,
     form_url=None,
-    image_urls=None
+    image_urls=None,
+    question_mapping=None
 ):
     """
-    Saves Google Form details and generated image URLs.
+    Saves Google Form details, generated image URLs,
+    and Google question ID to field_name mappings.
     """
 
     connection = None
@@ -60,6 +63,7 @@ def save_recruitment_metadata(
         cursor = connection.cursor()
 
         image_urls = image_urls or []
+        question_mapping = question_mapping or {}
 
         cursor.execute(
             """
@@ -67,16 +71,18 @@ def save_recruitment_metadata(
                 post_id,
                 form_id,
                 form_url,
-                image_urls
+                image_urls,
+                question_mapping
             )
-            VALUES (%s, %s, %s, %s::jsonb)
+            VALUES (%s, %s, %s, %s::jsonb, %s::jsonb)
             RETURNING metadata_id;
             """,
             (
                 post_id,
                 form_id,
                 form_url,
-                json.dumps(image_urls)
+                json.dumps(image_urls),
+                json.dumps(question_mapping)
             )
         )
 
@@ -95,6 +101,7 @@ def save_recruitment_metadata(
             cursor.close()
         if connection:
             connection.close()
+
 
 
 def get_recruitment_post(post_id):

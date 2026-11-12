@@ -409,8 +409,17 @@ def create_google_form(title, questions, job_description):
 
     ordered_questions = standard_questions + additional_questions
 
+# Keep field names in exactly the same order as Google Form requests.
+# Resume/file questions are skipped because they are handled separately.
+    question_field_names = [
+        question["field_name"]
+        for question in ordered_questions
+        if question.get("type", "").lower().strip().replace("-", "_")
+        not in ("file", "file_upload")
+    ]
+
     requests, skipped_questions = prepare_google_form_questions(
-    ordered_questions
+        ordered_questions
     )
 
     service = get_forms_service()
@@ -436,7 +445,7 @@ def create_google_form(title, questions, job_description):
             "Google Form creation did not return a form ID."
         )
     # Rename the Google Drive file using the form title
-    rename_form_in_drive(form_id, title)
+    drive_file_name = rename_form_in_drive(form_id, title)
     # --------------------------------------------------------
     # 2. ADD DESCRIPTION AND APPLICATION QUESTIONS
     # --------------------------------------------------------
@@ -454,33 +463,84 @@ def create_google_form(title, questions, job_description):
 
     batch_requests.extend(requests)
 
-    service.forms().batchUpdate(
+    batch_response = service.forms().batchUpdate(
         formId=form_id,
         body={
             "requests": batch_requests
         }
     ).execute()
 
-    # --------------------------------------------------------
-    # 3. RETRIEVE COMPLETED FORM
-    # --------------------------------------------------------
+    # First reply belongs to updateFormInfo.
+    # Remaining replies correspond to the createItem requests.
+    replies = batch_response.get("replies", [])
 
+    if len(replies) != len(requests) + 1:
+        raise RuntimeError(
+            "Google Forms returned an unexpected number of replies."
+        )
+
+    
+    question_mapping = {}
+
+    for index, field_name in enumerate(question_field_names, start=1):
+
+        create_item_response = replies[index].get("createItem", {})
+        question_ids = create_item_response.get("questionId", [])
+
+        if not question_ids:
+            raise RuntimeError(
+                f"Google did not return a question ID for {field_name}."
+            )
+
+        question_mapping[question_ids[0]] = field_name
+
+    # Retrieve completed form AFTER processing all questions
     form_details = service.forms().get(
         formId=form_id
     ).execute()
 
     return {
+        "form_id": form_id,
+        "title": form_details.get("info", {}).get("title"),
+        "description": form_details.get("info", {}).get("description"),
+        "form_url": form_details.get("responderUri"),
+        "drive_file_name": drive_file_name,
+        "skipped_questions": skipped_questions,
+        "question_mapping": question_mapping
+    }
+
+
+    for index, field_name in enumerate(question_field_names, start=1):
+
+        create_item_response = replies[index].get("createItem", {})
+        question_ids = create_item_response.get("questionId", [])
+
+        if not question_ids:
+            raise RuntimeError(
+                f"Google did not return a question ID for {field_name}."
+            )
+
+        question_mapping[question_ids[0]] = field_name
+        # --------------------------------------------------------
+        # 3. RETRIEVE COMPLETED FORM
+        # --------------------------------------------------------
+
+        form_details = service.forms().get(
+            formId=form_id
+        ).execute()
+
+        return {
     "form_id": form_id,
     "title": form_details.get("info", {}).get("title"),
     "description": form_details.get("info", {}).get("description"),
     "form_url": form_details.get("responderUri"),
     "drive_file_name": drive_file_name,
-    "skipped_questions": skipped_questions
+    "skipped_questions": skipped_questions,
+    "question_mapping": question_mapping
 }
 # ============================================================
 # CREATE GOOGLE FORM DIRECTLY FROM JSON
 # ============================================================
-
 def create_google_form_from_json(data):
 
     if not isinstance(data, dict):
