@@ -1,82 +1,43 @@
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field
-
-from services.google_form_service import create_google_form
-
-
+from pydantic import BaseModel
+from backend.services.google_form_service import create_google_form_from_json
 router = APIRouter(
     prefix="/google-forms",
     tags=["Google Forms"]
 )
 
 
-# Individual recruitment question
-class QuestionRequest(BaseModel):
-    question: str
-    type: str
-    required: bool = False
-    options: list[str] = Field(default_factory=list)
-
-
-# Recruitment form request
 class FormRequest(BaseModel):
-    job_title: str
-    department: str | None = None
-    questions: list[QuestionRequest]
+    job_post: dict
+    application_form: dict
 
 
 @router.post("/create")
 def create_form(request: FormRequest):
-
     try:
+        data = request.model_dump()
 
-        # Validate job title
-        if not request.job_title.strip():
-            raise ValueError("Job title cannot be empty.")
-
-        # Generate a relatable Google Form title
-        if request.department:
-            form_title = (
-                f"Nexora - {request.job_title.strip()} "
-                f"({request.department.strip()}) "
-                "Recruitment Application"
-            )
-        else:
-            form_title = (
-                f"Nexora - {request.job_title.strip()} "
-                "Recruitment Application"
-            )
-
-        # Convert question models into dictionaries
-        questions = [
-            question.model_dump()
-            for question in request.questions
-        ]
-
-        # Generate Google Form
-        result = create_google_form(
-            title=form_title,
-            questions=questions
-        )
+        result = create_google_form_from_json(data)
 
         return {
             "message": "Google Form created successfully!",
             "form_id": result["form_id"],
             "title": result["title"],
-            "form_url": result["form_url"]
+            "description": result["description"],
+            "form_url": result["form_url"],
+            "question_mapping": result["question_mapping"],
+            "skipped_questions": result["skipped_questions"]
         }
 
-    except ValueError as e:
-
+    except ValueError as error:
         raise HTTPException(
             status_code=400,
-            detail=str(e)
+            detail=str(error)
         )
 
-    except Exception as e:
-
+    except Exception as error:
         raise HTTPException(
             status_code=500,
-            detail=str(e)
+            detail=str(error)
         )

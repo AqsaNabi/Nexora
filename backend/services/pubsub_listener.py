@@ -4,6 +4,7 @@ import threading
 import time
 
 from google.cloud import pubsub_v1
+from google.auth.exceptions import DefaultCredentialsError
 
 from backend.services.applicant_response_service import (
     process_form_responses
@@ -16,17 +17,25 @@ SUBSCRIPTION_PATH = (
     f"projects/{PROJECT_ID}/subscriptions/{SUBSCRIPTION_ID}"
 )
 
-subscriber = pubsub_v1.SubscriberClient()
+subscriber = None
 
 _listener_thread = None
 _stop_event = threading.Event()
+
+
+def _get_subscriber():
+    global subscriber
+
+    if subscriber is None:
+        subscriber = pubsub_v1.SubscriberClient()
+
+    return subscriber
 
 
 def _process_message(received_message):
     message = received_message.message
 
     try:
-        # Google Forms sends notification details as Pub/Sub attributes.
         attributes = dict(message.attributes)
 
         form_id = attributes.get("formId")
@@ -58,11 +67,22 @@ def _process_message(received_message):
 
 
 def _listen():
+    global subscriber
+
     print("Nexora Pub/Sub listener started.")
+
+    try:
+        client = _get_subscriber()
+    except DefaultCredentialsError:
+        print(
+            "Pub/Sub listener not started: "
+            "Google Cloud credentials are not configured."
+        )
+        return
 
     while not _stop_event.is_set():
         try:
-            response = subscriber.pull(
+            response = client.pull(
                 request={
                     "subscription": SUBSCRIPTION_PATH,
                     "max_messages": 10
@@ -78,15 +98,14 @@ def _listen():
                 success = _process_message(received_message)
 
                 if success:
-                    subscriber.acknowledge(
+                    client.acknowledge(
                         request={
                             "subscription": SUBSCRIPTION_PATH,
                             "ack_ids": [received_message.ack_id]
                         }
                     )
                 else:
-                    # Release the message for redelivery.
-                    subscriber.modify_ack_deadline(
+                    client.modify_ack_deadline(
                         request={
                             "subscription": SUBSCRIPTION_PATH,
                             "ack_ids": [received_message.ack_id],
@@ -120,9 +139,13 @@ def start_pubsub_listener():
 
 
 def stop_pubsub_listener():
+    global subscriber
+
     _stop_event.set()
 
     if _listener_thread and _listener_thread.is_alive():
         _listener_thread.join(timeout=5)
 
-    subscriber.close()
+    if subscriber is not None:
+        subscriber.close()
+        subscriber = None

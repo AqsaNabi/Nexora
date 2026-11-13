@@ -1,4 +1,5 @@
 
+import json
 from pathlib import Path
 
 from google.oauth2.credentials import Credentials
@@ -6,13 +7,20 @@ from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 
 
+# ============================================================
+# CONFIGURATION
+# ============================================================
+
 BASE_DIR = Path(__file__).resolve().parents[1]
 TOKEN_FILE = BASE_DIR / "authen" / "token.json"
+
 FORMS_SCOPE = [
     "https://www.googleapis.com/auth/forms.body",
     "https://www.googleapis.com/auth/forms.responses.readonly",
     "https://www.googleapis.com/auth/drive.file"
 ]
+
+
 # ============================================================
 # STANDARD APPLICANT FIELDS
 # ============================================================
@@ -30,11 +38,13 @@ STANDARD_FIELD_ORDER = [
     "phone",
     "resume_file"
 ]
+
+
 # ============================================================
-# GOOGLE FORMS AUTHENTICATION
+# GOOGLE AUTHENTICATION
 # ============================================================
 
-def get_forms_service():
+def get_credentials():
 
     if not TOKEN_FILE.exists():
         raise FileNotFoundError(
@@ -51,8 +61,23 @@ def get_forms_service():
 
         credentials.refresh(Request())
 
-        with open(TOKEN_FILE, "w", encoding="utf-8") as token_file:
-            token_file.write(credentials.to_json())
+        TOKEN_FILE.write_text(
+            credentials.to_json(),
+            encoding="utf-8"
+        )
+
+    if not credentials.valid:
+        raise ValueError(
+            "Google credentials are invalid. "
+            "Please authenticate with Google again."
+        )
+
+    return credentials
+
+
+def get_forms_service():
+
+    credentials = get_credentials()
 
     return build(
         "forms",
@@ -61,42 +86,46 @@ def get_forms_service():
     )
 
 
-def rename_form_in_drive(form_id, title):
+def get_drive_service():
 
-    credentials = Credentials.from_authorized_user_file(
-        str(TOKEN_FILE),
-        scopes=FORMS_SCOPE
-    )
+    credentials = get_credentials()
 
-    if credentials.expired and credentials.refresh_token:
-        credentials.refresh(Request())
-
-        with open(TOKEN_FILE, "w", encoding="utf-8") as token_file:
-            token_file.write(credentials.to_json())
-
-    drive_service = build(
+    return build(
         "drive",
         "v3",
         credentials=credentials
     )
 
-    renamed_file = drive_service.files().update(
+
+# ============================================================
+# RENAME GOOGLE FORM
+# ============================================================
+
+def rename_form_in_drive(form_id, title):
+
+    drive_service = get_drive_service()
+
+    result = drive_service.files().update(
         fileId=form_id,
         body={
             "name": title.strip()
         },
-        fields="id, name"
+        fields="id,name"
     ).execute()
 
-    return renamed_file.get("name")
+    return result.get("name")
+
+
 # ============================================================
-# VALIDATE AND SEPARATE STANDARD / ADDITIONAL QUESTIONS
+# VALIDATE AND SEPARATE QUESTIONS
 # ============================================================
 
 def separate_questions(questions):
 
     if not isinstance(questions, list) or not questions:
-        raise ValueError("Questions must be a non-empty list.")
+        raise ValueError(
+            "Questions must be a non-empty list."
+        )
 
     question_map = {}
 
@@ -118,12 +147,11 @@ def separate_questions(questions):
 
         if field_name in question_map:
             raise ValueError(
-                f"Duplicate field_name found: {field_name}"
+                f"Duplicate field_name: {field_name}"
             )
 
         question_map[field_name] = question
 
-    # Check that all standard fields exist
     missing_fields = [
         field
         for field in STANDARD_FIELD_ORDER
@@ -138,7 +166,6 @@ def separate_questions(questions):
     standard_questions = []
     additional_questions = []
 
-    # Keep standard fields in a predictable order
     for field_name in STANDARD_FIELD_ORDER:
 
         question = question_map[field_name]
@@ -160,13 +187,13 @@ def separate_questions(questions):
 
         standard_questions.append(question)
 
-    # Everything else is job-specific
     for field_name, question in question_map.items():
 
         if field_name not in STANDARD_FIELDS:
             additional_questions.append(question)
 
     return standard_questions, additional_questions
+
 
 # ============================================================
 # PREPARE GOOGLE FORM QUESTIONS
@@ -181,12 +208,20 @@ def prepare_google_form_questions(questions):
 
     requests = []
     skipped_questions = []
+    question_field_names = []
 
     for index, question in enumerate(questions):
 
         question_text = question.get("question", "").strip()
-        question_type = question.get("type", "").lower().strip()
-        question_type = question_type.replace("-", "_")
+
+        question_type = (
+            question.get("type", "")
+            .lower()
+            .strip()
+            .replace("-", "_")
+        )
+
+        field_name = question.get("field_name")
 
         required = question.get("required", False)
         options = question.get("options", [])
@@ -194,6 +229,11 @@ def prepare_google_form_questions(questions):
         if not question_text:
             raise ValueError(
                 f"Question {index + 1} has no question text."
+            )
+
+        if not isinstance(field_name, str) or not field_name.strip():
+            raise ValueError(
+                f"Question {index + 1} has no field_name."
             )
 
         if not isinstance(required, bool):
@@ -206,23 +246,19 @@ def prepare_google_form_questions(questions):
                 f"Options must be a list for question {index + 1}."
             )
 
-        # ----------------------------------------------------
         # FILE UPLOAD
-        # ----------------------------------------------------
 
         if question_type in ("file", "file_upload"):
 
             skipped_questions.append({
-                "field_name": question.get("field_name"),
+                "field_name": field_name,
                 "question": question_text,
                 "reason": "Handled separately through FastAPI."
             })
 
             continue
 
-        # ----------------------------------------------------
         # SHORT ANSWER
-        # ----------------------------------------------------
 
         if question_type in (
             "text",
@@ -238,9 +274,7 @@ def prepare_google_form_questions(questions):
                 }
             }
 
-        # ----------------------------------------------------
         # PARAGRAPH
-        # ----------------------------------------------------
 
         elif question_type == "paragraph":
 
@@ -250,9 +284,7 @@ def prepare_google_form_questions(questions):
                 }
             }
 
-        # ----------------------------------------------------
         # YES / NO
-        # ----------------------------------------------------
 
         elif question_type == "yes_no":
 
@@ -267,9 +299,7 @@ def prepare_google_form_questions(questions):
                 }
             }
 
-        # ----------------------------------------------------
         # MULTIPLE CHOICE
-        # ----------------------------------------------------
 
         elif question_type == "multiple_choice":
 
@@ -290,9 +320,7 @@ def prepare_google_form_questions(questions):
                 }
             }
 
-        # ----------------------------------------------------
         # CHECKBOX
-        # ----------------------------------------------------
 
         elif question_type == "checkbox":
 
@@ -313,9 +341,7 @@ def prepare_google_form_questions(questions):
                 }
             }
 
-        # ----------------------------------------------------
         # DROPDOWN
-        # ----------------------------------------------------
 
         elif question_type == "dropdown":
 
@@ -336,9 +362,7 @@ def prepare_google_form_questions(questions):
                 }
             }
 
-        # ----------------------------------------------------
         # DATE
-        # ----------------------------------------------------
 
         elif question_type == "date":
 
@@ -375,12 +399,14 @@ def prepare_google_form_questions(questions):
             }
         })
 
+        question_field_names.append(field_name)
+
     if not requests:
         raise ValueError(
             "No supported Google Form questions found."
         )
 
-    return requests, skipped_questions
+    return requests, skipped_questions, question_field_names
 
 
 # ============================================================
@@ -402,24 +428,20 @@ def create_google_form(title, questions, job_description):
             "A valid job description is required."
         )
 
-    # Prepare questions before creating the form
+    # Validate questions
+
     standard_questions, additional_questions = separate_questions(
-    questions
+        questions
     )
 
-    ordered_questions = standard_questions + additional_questions
+    ordered_questions = (
+        standard_questions + additional_questions
+    )
 
-# Keep field names in exactly the same order as Google Form requests.
-# Resume/file questions are skipped because they are handled separately.
-    question_field_names = [
-        question["field_name"]
-        for question in ordered_questions
-        if question.get("type", "").lower().strip().replace("-", "_")
-        not in ("file", "file_upload")
-    ]
+    # Prepare Google API requests
 
-    requests, skipped_questions = prepare_google_form_questions(
-        ordered_questions
+    requests, skipped_questions, question_field_names = (
+        prepare_google_form_questions(ordered_questions)
     )
 
     service = get_forms_service()
@@ -428,26 +450,32 @@ def create_google_form(title, questions, job_description):
     # 1. CREATE GOOGLE FORM
     # --------------------------------------------------------
 
-    form_body = {
-        "info": {
-            "title": title.strip()
+    form_response = service.forms().create(
+        body={
+            "info": {
+                "title": title.strip()
+            }
         }
-    }
-
-    response = service.forms().create(
-        body=form_body
     ).execute()
 
-    form_id = response.get("formId")
+    form_id = form_response.get("formId")
 
     if not form_id:
         raise RuntimeError(
             "Google Form creation did not return a form ID."
         )
-    # Rename the Google Drive file using the form title
-    drive_file_name = rename_form_in_drive(form_id, title)
+
     # --------------------------------------------------------
-    # 2. ADD DESCRIPTION AND APPLICATION QUESTIONS
+    # 2. RENAME GOOGLE DRIVE FILE
+    # --------------------------------------------------------
+
+    drive_file_name = rename_form_in_drive(
+        form_id,
+        title
+    )
+
+    # --------------------------------------------------------
+    # 3. ADD DESCRIPTION AND QUESTIONS
     # --------------------------------------------------------
 
     batch_requests = [
@@ -470,8 +498,6 @@ def create_google_form(title, questions, job_description):
         }
     ).execute()
 
-    # First reply belongs to updateFormInfo.
-    # Remaining replies correspond to the createItem requests.
     replies = batch_response.get("replies", [])
 
     if len(replies) != len(requests) + 1:
@@ -479,13 +505,25 @@ def create_google_form(title, questions, job_description):
             "Google Forms returned an unexpected number of replies."
         )
 
-    
+    # --------------------------------------------------------
+    # 4. CREATE QUESTION ID TO FIELD NAME MAPPING
+    # --------------------------------------------------------
+
     question_mapping = {}
 
-    for index, field_name in enumerate(question_field_names, start=1):
+    for index, field_name in enumerate(
+        question_field_names,
+        start=1
+    ):
 
-        create_item_response = replies[index].get("createItem", {})
-        question_ids = create_item_response.get("questionId", [])
+        create_item_response = (
+            replies[index].get("createItem", {})
+        )
+
+        question_ids = create_item_response.get(
+            "questionId",
+            []
+        )
 
         if not question_ids:
             raise RuntimeError(
@@ -494,73 +532,69 @@ def create_google_form(title, questions, job_description):
 
         question_mapping[question_ids[0]] = field_name
 
-    # Retrieve completed form AFTER processing all questions
+    # --------------------------------------------------------
+    # 5. RETRIEVE COMPLETED FORM
+    # --------------------------------------------------------
+    
+    # 5. RETRIEVE COMPLETED FORM
+
     form_details = service.forms().get(
         formId=form_id
     ).execute()
+
+    form_url = form_details.get("responderUri")
+
+    if not form_url:
+        raise RuntimeError(
+            "Google Form was created, but its responder URL "
+            "could not be retrieved."
+        )
 
     return {
         "form_id": form_id,
         "title": form_details.get("info", {}).get("title"),
         "description": form_details.get("info", {}).get("description"),
-        "form_url": form_details.get("responderUri"),
+        "form_url": form_url,
         "drive_file_name": drive_file_name,
         "skipped_questions": skipped_questions,
         "question_mapping": question_mapping
     }
 
 
-    for index, field_name in enumerate(question_field_names, start=1):
-
-        create_item_response = replies[index].get("createItem", {})
-        question_ids = create_item_response.get("questionId", [])
-
-        if not question_ids:
-            raise RuntimeError(
-                f"Google did not return a question ID for {field_name}."
-            )
-
-        question_mapping[question_ids[0]] = field_name
-        # --------------------------------------------------------
-        # 3. RETRIEVE COMPLETED FORM
-        # --------------------------------------------------------
-
-        form_details = service.forms().get(
-            formId=form_id
-        ).execute()
-
-        return {
-    "form_id": form_id,
-    "title": form_details.get("info", {}).get("title"),
-    "description": form_details.get("info", {}).get("description"),
-    "form_url": form_details.get("responderUri"),
-    "drive_file_name": drive_file_name,
-    "skipped_questions": skipped_questions,
-    "question_mapping": question_mapping
-}
 # ============================================================
-# CREATE GOOGLE FORM DIRECTLY FROM JSON
+# CREATE GOOGLE FORM DIRECTLY FROM APPROVED JSON
 # ============================================================
+
 def create_google_form_from_json(data):
 
     if not isinstance(data, dict):
-        raise ValueError("Input must be a JSON dictionary.")
+        raise ValueError(
+            "Input must be a JSON dictionary."
+        )
 
     job_post = data.get("job_post")
     application_form = data.get("application_form")
 
     if not isinstance(job_post, dict):
-        raise ValueError("Missing or invalid job_post object.")
+        raise ValueError(
+            "Missing or invalid job_post object."
+        )
 
     if not isinstance(application_form, dict):
-        raise ValueError("Missing or invalid application_form object.")
+        raise ValueError(
+            "Missing or invalid application_form object."
+        )
 
     form_title = application_form.get("form_title")
+
     job_description = job_post.get("job_description")
+
     questions = application_form.get("questions")
 
     if not isinstance(questions, list):
-        raise ValueError("Application questions must be a list.")
+        raise ValueError(
+            "Application questions must be a list."
+        )
 
     return create_google_form(
         title=form_title,

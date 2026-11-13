@@ -1,5 +1,7 @@
+
 JOB_POST_FIELDS = [
     "job_title",
+    "job_description",
     "department",
     "location",
     "work_mode",
@@ -33,10 +35,7 @@ def prepare_job_post(job_post):
 
     for field in JOB_POST_FIELDS:
 
-        value = job_post.get(
-            field,
-            [] if field in LIST_FIELDS else ""
-        )
+        value = job_post.get(field)
 
         if field in LIST_FIELDS:
 
@@ -46,14 +45,15 @@ def prepare_job_post(job_post):
             if not isinstance(value, list):
                 value = [value]
 
-            prepared_job_post[field] = value
-
         else:
 
             if value is None:
                 value = ""
 
-            prepared_job_post[field] = value
+            if not isinstance(value, str):
+                value = str(value)
+
+        prepared_job_post[field] = value
 
     return prepared_job_post
 
@@ -65,13 +65,10 @@ def prepare_application_form(application_form):
 
     form_title = application_form.get("form_title", "")
 
-    if form_title is None:
-        form_title = ""
+    if not isinstance(form_title, str):
+        raise ValueError("Form title must be text.")
 
     questions = application_form.get("questions", [])
-
-    if questions is None:
-        questions = []
 
     if not isinstance(questions, list):
         raise ValueError("Application questions must be a list.")
@@ -87,46 +84,53 @@ def prepare_application_form(application_form):
 
         question_text = question.get("question", "")
         question_type = question.get("type", "")
+        field_name = question.get("field_name", "")
         required = question.get("required", False)
         options = question.get("options", [])
-
-        if question_text is None:
-            question_text = ""
-
-        if question_type is None:
-            question_type = ""
+        validation = question.get("validation", {})
 
         if not isinstance(question_text, str):
             raise ValueError(
-                f"Invalid question text for question {index}."
+                f"Invalid question text at question {index}."
             )
 
         if not isinstance(question_type, str):
             raise ValueError(
-                f"Invalid question type for question {index}."
+                f"Invalid question type at question {index}."
+            )
+
+        if not isinstance(field_name, str):
+            raise ValueError(
+                f"Invalid field_name at question {index}."
             )
 
         if not isinstance(required, bool):
             raise ValueError(
-                f"Required must be true or false for question {index}."
+                f"Required must be true or false at question {index}."
             )
-
-        if options is None:
-            options = []
 
         if not isinstance(options, list):
             raise ValueError(
-                f"Options must be a list for question {index}."
+                f"Options must be a list at question {index}."
+            )
+
+        if not isinstance(validation, dict):
+            raise ValueError(
+                f"Validation must be a JSON object at question {index}."
             )
 
         prepared_questions.append({
+            "field_name": field_name,
             "question": question_text,
             "type": question_type,
             "required": required,
-            "options": options
+            "options": options,
+            "validation": validation
         })
 
     return {
         "form_title": form_title,
-        "questions": prepared_questions
+        "questions": prepared_questions,
+        "additional_data": application_form.get("additional_data", {}),
+        "submitted_at": application_form.get("submitted_at", "")
     }

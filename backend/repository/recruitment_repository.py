@@ -3,7 +3,6 @@ import json
 
 from backend.database.recruitment_db import get_recruitment_connection
 
-
 def create_recruitment_post(job_description):
     """
     Creates a recruitment post and returns its generated post ID.
@@ -43,18 +42,15 @@ def create_recruitment_post(job_description):
 
 
 
+
 def save_recruitment_metadata(
     post_id,
     form_id=None,
     form_url=None,
     image_urls=None,
-    question_mapping=None
+    question_mapping=None,
+    application_form=None
 ):
-    """
-    Saves Google Form details, generated image URLs,
-    and Google question ID to field_name mappings.
-    """
-
     connection = None
     cursor = None
 
@@ -62,29 +58,35 @@ def save_recruitment_metadata(
         connection = get_recruitment_connection()
         cursor = connection.cursor()
 
-        image_urls = image_urls or []
-        question_mapping = question_mapping or {}
-
         cursor.execute(
-            """
-            INSERT INTO recruitment_metadata (
-                post_id,
-                form_id,
-                form_url,
-                image_urls,
-                question_mapping
-            )
-            VALUES (%s, %s, %s, %s::jsonb, %s::jsonb)
-            RETURNING metadata_id;
-            """,
-            (
-                post_id,
-                form_id,
-                form_url,
-                json.dumps(image_urls),
-                json.dumps(question_mapping)
-            )
+        """
+        INSERT INTO recruitment_metadata (
+            post_id,
+            form_id,
+            form_url,
+            image_urls,
+            question_mapping,
+            application_form
         )
+        VALUES (
+            %s,
+            %s,
+            %s,
+            %s::jsonb,
+            %s::jsonb,
+            %s::jsonb
+        )
+        RETURNING metadata_id;
+        """,
+        (
+            post_id,
+            form_id,
+            form_url,
+            json.dumps(image_urls or []),
+            json.dumps(question_mapping or {}),
+            json.dumps(application_form or {})
+        )
+    )
 
         metadata_id = cursor.fetchone()[0]
         connection.commit()
@@ -94,15 +96,15 @@ def save_recruitment_metadata(
     except Exception as error:
         if connection:
             connection.rollback()
-        raise Exception(f"Failed to save recruitment metadata: {error}")
+        raise Exception(
+            f"Failed to save recruitment metadata: {error}"
+        )
 
     finally:
         if cursor:
             cursor.close()
         if connection:
             connection.close()
-
-
 
 def get_recruitment_post(post_id):
     """
