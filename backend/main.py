@@ -3,6 +3,7 @@ from routes.login import router as login_router
 from routes.register import router as register_router
 from routes.details import router as details_router
 from routes.announcements import router as announcements_router
+from routes.policy import router as policy_router
 from fastapi.middleware.cors import CORSMiddleware
 from routes.auth_routes import router as auth_router
 app = FastAPI()
@@ -18,3 +19,4 @@ app.include_router(register_router)
 app.include_router(login_router)
 app.include_router(details_router)
 app.include_router(announcements_router)
+app.include_router(policy_router)
