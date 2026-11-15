@@ -504,7 +504,6 @@ def validate_ai_response(result):
 # GENERATE AI RESPONSE
 # ============================================================
 
-
 def generate_ai_response(conversation):
 
     llm = ChatOpenAI(
@@ -533,6 +532,3 @@ def generate_ai_response(conversation):
     result = validate_ai_response(result)
 
     return result
-
-    
-

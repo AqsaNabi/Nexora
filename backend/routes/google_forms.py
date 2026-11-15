@@ -8,6 +8,15 @@ router = APIRouter(
 )
 
 
+# Individual recruitment question
+class QuestionRequest(BaseModel):
+    question: str
+    type: str
+    required: bool = False
+    options: list[str] = Field(default_factory=list)
+
+
+# Recruitment form request
 class FormRequest(BaseModel):
     job_post: dict
     application_form: dict

@@ -14,6 +14,14 @@ from googleapiclient.discovery import build
 
 BASE_DIR = Path(__file__).resolve().parents[1]
 TOKEN_FILE = BASE_DIR / "authen" / "token.json"
+FORMS_SCOPE = [
+    "https://www.googleapis.com/auth/forms.body",
+    "https://www.googleapis.com/auth/forms.responses.readonly",
+    "https://www.googleapis.com/auth/drive.file"
+]
+# ============================================================
+# STANDARD APPLICANT FIELDS
+# ============================================================
 
 TEMPLATE_FORM_ID = os.getenv(
     "GOOGLE_FORM_TEMPLATE_ID",
