@@ -3,11 +3,8 @@ import json
 
 from backend.database.recruitment_db import get_recruitment_connection
 
-def create_recruitment_post(job_description):
-    """
-    Creates a recruitment post and returns its generated post ID.
-    """
 
+def create_recruitment_post(job_description):
     connection = None
     cursor = None
 
@@ -26,7 +23,6 @@ def create_recruitment_post(job_description):
 
         post_id = cursor.fetchone()[0]
         connection.commit()
-
         return post_id
 
     except Exception as error:
@@ -39,8 +35,6 @@ def create_recruitment_post(job_description):
             cursor.close()
         if connection:
             connection.close()
-
-
 
 
 def save_recruitment_metadata(
@@ -59,46 +53,32 @@ def save_recruitment_metadata(
         cursor = connection.cursor()
 
         cursor.execute(
-        """
-        INSERT INTO recruitment_metadata (
-            post_id,
-            form_id,
-            form_url,
-            image_urls,
-            question_mapping,
-            application_form
+            """
+            INSERT INTO recruitment_metadata (
+                post_id, form_id, form_url, image_urls,
+                question_mapping, application_form
+            )
+            VALUES (%s, %s, %s, %s::jsonb, %s::jsonb, %s::jsonb)
+            RETURNING metadata_id;
+            """,
+            (
+                post_id,
+                form_id,
+                form_url,
+                json.dumps(image_urls or []),
+                json.dumps(question_mapping or {}),
+                json.dumps(application_form or {})
+            )
         )
-        VALUES (
-            %s,
-            %s,
-            %s,
-            %s::jsonb,
-            %s::jsonb,
-            %s::jsonb
-        )
-        RETURNING metadata_id;
-        """,
-        (
-            post_id,
-            form_id,
-            form_url,
-            json.dumps(image_urls or []),
-            json.dumps(question_mapping or {}),
-            json.dumps(application_form or {})
-        )
-    )
 
         metadata_id = cursor.fetchone()[0]
         connection.commit()
-
         return metadata_id
 
     except Exception as error:
         if connection:
             connection.rollback()
-        raise Exception(
-            f"Failed to save recruitment metadata: {error}"
-        )
+        raise Exception(f"Failed to save recruitment metadata: {error}")
 
     finally:
         if cursor:
@@ -106,11 +86,8 @@ def save_recruitment_metadata(
         if connection:
             connection.close()
 
-def get_recruitment_post(post_id):
-    """
-    Retrieves a recruitment post with its metadata.
-    """
 
+def get_recruitment_post(post_id):
     connection = None
     cursor = None
 
@@ -120,13 +97,8 @@ def get_recruitment_post(post_id):
 
         cursor.execute(
             """
-            SELECT
-                p.post_id,
-                p.job_description,
-                m.form_id,
-                m.form_url,
-                m.image_urls,
-                m.created_at
+            SELECT p.post_id, p.job_description, m.form_id,
+                   m.form_url, m.image_urls, m.created_at
             FROM recruitment_posts p
             LEFT JOIN recruitment_metadata m
                 ON p.post_id = m.post_id
@@ -160,11 +132,6 @@ def get_recruitment_post(post_id):
 
 
 def get_applicants_by_post(post_id):
-    """
-    Retrieves all applicants associated with a recruitment post.
-    Does not return the actual PDF bytes.
-    """
-
     connection = None
     cursor = None
 
@@ -174,16 +141,9 @@ def get_applicants_by_post(post_id):
 
         cursor.execute(
             """
-            SELECT
-                application_id,
-                post_id,
-                full_name,
-                email,
-                phone,
-                resume_filename,
-                resume_content_type,
-                additional_data,
-                submitted_at
+            SELECT application_id, post_id, full_name, email, phone,
+                   resume_filename, resume_content_type,
+                   additional_data, submitted_at
             FROM recruitment_data
             WHERE post_id = %s
             ORDER BY submitted_at DESC;
@@ -210,6 +170,107 @@ def get_applicants_by_post(post_id):
 
     except Exception as error:
         raise Exception(f"Failed to retrieve applicants: {error}")
+
+    finally:
+        if cursor:
+            cursor.close()
+        if connection:
+            connection.close()
+
+
+def attach_resume_to_applicant(
+    post_id,
+    email,
+    resume_content,
+    resume_filename,
+    resume_content_type
+):
+    connection = None
+    cursor = None
+
+    try:
+        connection = get_recruitment_connection()
+        cursor = connection.cursor()
+
+        # Find the applicant for this specific recruitment post.
+        cursor.execute(
+            """
+            SELECT application_id
+            FROM recruitment_data
+            WHERE post_id = %s
+              AND LOWER(TRIM(email)) = LOWER(TRIM(%s));
+            """,
+            (post_id, email)
+        )
+
+        applicants = cursor.fetchall()
+
+        if not applicants:
+            return {
+                "success": False,
+                "message": (
+                    "Application details have not been received yet. "
+                    "Please try again shortly."
+                )
+            }
+
+        if len(applicants) > 1:
+            return {
+                "success": False,
+                "message": (
+                    "Multiple applications were found for this email "
+                    "and recruitment post. Please contact HR."
+                )
+            }
+
+        application_id = applicants[0][0]
+
+        # Do not silently overwrite an already uploaded resume.
+        cursor.execute(
+            """
+            SELECT resume_file
+            FROM recruitment_data
+            WHERE application_id = %s;
+            """,
+            (application_id,)
+        )
+
+        existing_resume = cursor.fetchone()[0]
+
+        if existing_resume is not None:
+            return {
+                "success": False,
+                "message": "A resume has already been uploaded for this application."
+            }
+
+        cursor.execute(
+            """
+            UPDATE recruitment_data
+            SET resume_file = %s,
+                resume_filename = %s,
+                resume_content_type = %s
+            WHERE application_id = %s;
+            """,
+            (
+                resume_content,
+                resume_filename,
+                resume_content_type,
+                application_id
+            )
+        )
+
+        connection.commit()
+
+        return {
+            "success": True,
+            "message": "Resume uploaded successfully.",
+            "application_id": application_id
+        }
+
+    except Exception:
+        if connection:
+            connection.rollback()
+        raise
 
     finally:
         if cursor:

@@ -1,8 +1,7 @@
 
-from fastapi import APIRouter, UploadFile, File, HTTPException
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 
 from backend.services.resume_service import save_resume
-
 
 router = APIRouter(
     prefix="/resumes",
@@ -10,35 +9,44 @@ router = APIRouter(
 )
 
 
-# ============================================================
-# UPLOAD RESUME ENDPOINT
-# ============================================================
-
 @router.post("/upload")
 async def upload_resume(
+    post_id: str = Form(...),
+    email: str = Form(...),
     file: UploadFile = File(...)
 ):
-
     try:
+        result = await save_resume(
+            file=file,
+            post_id=post_id,
+            email=email
+        )
 
-        result = await save_resume(file)
+        if not result["success"]:
+            raise HTTPException(
+                status_code=400,
+                detail=result["message"]
+            )
 
         return {
             "success": True,
-            "message": "Resume uploaded successfully.",
-            "data": result
+            "message": result["message"],
+            "application_id": result["application_id"]
         }
 
     except ValueError as error:
-
         raise HTTPException(
             status_code=400,
             detail=str(error)
         )
 
-    except RuntimeError as error:
+    except HTTPException:
+        raise
+
+    except Exception as error:
+        print(f"Resume upload failed: {error}")
 
         raise HTTPException(
             status_code=500,
-            detail=str(error)
+            detail="An error occurred while uploading the resume."
         )
