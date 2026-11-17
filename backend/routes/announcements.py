@@ -3,7 +3,7 @@ from fastapi import APIRouter, HTTPException,Depends
 from authen.auth import verify_token 
 from pydantic import BaseModel, Field
 
-from services.announcements import  create_announcement, update_announcement,approve_announcement,   reject_announcement
+from services.announcements import  create_announcement, update_announcement,approve_announcement,   reject_announcement,get_latest_announcement
    
    
     
@@ -14,7 +14,7 @@ from services.announcements import  create_announcement, update_announcement,app
 # ==========================================
 # Router
 # ==========================================
-router = APIRouter(dependencies=[Depends(verify_token)],
+router = APIRouter(
     prefix="/announcements",
     tags=["Announcements"]
 )
@@ -244,3 +244,15 @@ def reject_announcement_api(
             status_code=500,
             detail=f"Announcement rejection failed: {type(e).__name__}: {str(e)}"
         )
+@router.get("/latest")
+def get_latest_announcement_api(designation: str):
+
+    result = get_latest_announcement(
+        designation=designation
+    )
+
+    return {
+        "success": True,
+        "message": "Latest announcement fetched successfully",
+        "data": result
+    }

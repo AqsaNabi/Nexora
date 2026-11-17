@@ -1,7 +1,5 @@
 from database.concect import conn
 from psycopg2.extras import RealDictCursor
-
-
 def search_policy_chunks(
     question_embedding,
     top_k: int = 5,
@@ -20,7 +18,7 @@ def search_policy_chunks(
 
     query = """ 
         SELECT
-            id,
+            
             policy_id,
             chunk_index,
             chunk_text,

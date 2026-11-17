@@ -2,38 +2,30 @@
 from database.concect import conn, cur
 from psycopg2 import Binary
 from psycopg2.extras import Json
-
 from pgvector.psycopg2 import register_vector
 
 from model.policy_embed import embedding_model
 
 
-# ==========================================
-# PGVECTOR CONFIGURATION
-# ==========================================
-
-# Register pgvector with the existing connection
+# Register pgvector
 register_vector(conn)
 
 
-# ==========================================
-# STORE POLICY IN POSTGRESQL
-# ==========================================
-
 def create_policy(
-    policy_name,
     description,
     category,
     file_name,
     file_data,
     file_size
 ):
+    """
+    Store every uploaded policy as a new record.
+    """
 
     try:
         cur.execute(
             """
             INSERT INTO policies (
-                policy_name,
                 description,
                 category,
                 file_name,
@@ -41,21 +33,10 @@ def create_policy(
                 file_size,
                 uploaded_at
             )
-            VALUES (%s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
-
-            ON CONFLICT (category)
-            DO UPDATE SET
-                policy_name = EXCLUDED.policy_name,
-                description = EXCLUDED.description,
-                file_name = EXCLUDED.file_name,
-                file_data = EXCLUDED.file_data,
-                file_size = EXCLUDED.file_size,
-                uploaded_at = CURRENT_TIMESTAMP
-
+            VALUES (%s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
             RETURNING policy_id
             """,
             (
-                policy_name,
                 description,
                 category,
                 file_name,
@@ -70,11 +51,10 @@ def create_policy(
 
         return {
             "policy_id": policy_id,
-            "policy_name": policy_name,
             "category": category,
             "file_name": file_name,
             "file_size": file_size,
-            "message": "Policy uploaded or updated successfully"
+            "message": "New policy uploaded successfully"
         }
 
     except Exception as e:
@@ -82,64 +62,94 @@ def create_policy(
         raise e
 
 
-# ==========================================
-# STORE POLICY CHUNKS IN PGVECTOR
-# ==========================================
+def get_policy_file(policy_id):
+    """
+    Fetch the uploaded PDF from PostgreSQL.
+    """
+
+    cur.execute(
+        """
+        SELECT file_name, file_data
+        FROM policies
+        WHERE policy_id = %s
+        """,
+        (policy_id,)
+    )
+
+    result = cur.fetchone()
+
+    if not result:
+        raise ValueError("Policy file not found.")
+
+    return {
+        "file_name": result["file_name"],
+        "file_data": bytes(result["file_data"])
+    }
+
 
 def create_policy_chunks(
     policy_id,
-    policy_name,
     category,
     chunks
 ):
+    """
+    Generate embeddings and store new chunks.
+    """
 
     if not chunks:
         raise ValueError("No chunks available to store.")
 
     try:
 
-        # STEP 1: Generate embeddings for chunks
+        # STEP 1: Keep valid chunks
+        valid_chunks = [
+            chunk
+            for chunk in chunks
+            if chunk.get("text") and chunk["text"].strip()
+        ]
 
-        embeddings = embedding_model.embed_documents(chunks)
+        if not valid_chunks:
+            raise ValueError("No valid chunk text found.")
 
-        if len(embeddings) != len(chunks):
+        # STEP 2: Generate embeddings from text only
+        chunk_texts = [
+            chunk["text"]
+            for chunk in valid_chunks
+        ]
+
+        embeddings = embedding_model.embed_documents(chunk_texts)
+
+        if len(embeddings) != len(valid_chunks):
             raise ValueError(
                 "Number of embeddings does not match number of chunks."
             )
 
-        # STEP 2: Delete existing chunks of this policy
-
-        cur.execute(
-            """
-            DELETE FROM policy_chunks
-            WHERE policy_id = %s
-            """,
-            (int(policy_id),)
-        )
-
-        # STEP 3: Prepare chunk metadata
-
+        # STEP 3: Prepare records
         records = []
 
-        for i, chunk in enumerate(chunks):
+        for index, (chunk, embedding) in enumerate(
+            zip(valid_chunks, embeddings)
+        ):
 
-            metadata = {
+            chunk_index = chunk.get("chunk_index", index)
+
+            metadata = dict(chunk.get("metadata") or {})
+
+            metadata.update({
                 "policy_id": int(policy_id),
-                "policy_name": policy_name,
                 "category": category,
-                "chunk_index": i
-            }
+                "chunk_index": chunk_index
+            })
 
             records.append((
                 int(policy_id),
-                i,
-                chunk,
+                chunk_index,
+                chunk["text"],
                 Json(metadata),
-                embeddings[i]
+                embedding
             ))
 
-        # STEP 4: Insert chunks and embeddings into PostgreSQL
-
+        # STEP 4: Insert chunks
         cur.executemany(
             """
             INSERT INTO policy_chunks (
@@ -154,21 +164,16 @@ def create_policy_chunks(
             records
         )
 
-        # STEP 5: Commit transaction
-
         conn.commit()
 
         print(
-            f"Successfully stored {len(chunks)} chunks "
+            f"Successfully inserted {len(records)} chunks "
             f"for policy ID {policy_id}"
         )
 
-        return len(chunks)
+        return len(records)
 
     except Exception as e:
-
         conn.rollback()
-
-        print("Error storing policy chunks:", e)
-
+        print("Error storing policy chunks:", str(e))
         raise

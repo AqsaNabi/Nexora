@@ -94,3 +94,64 @@ def save_announcement(
         )
 
         raise
+# ==========================================
+# FETCH LATEST ANNOUNCEMENT
+# ==========================================
+
+def fetch_latest_announcement(designation):
+
+    try:
+
+        # ==========================================
+        # RESET PREVIOUS FAILED TRANSACTION
+        # ==========================================
+
+        conn.rollback()
+
+        # ==========================================
+        # FETCH LATEST ANNOUNCEMENT
+        # ==========================================
+
+        query = """
+            SELECT
+                announcement_id,
+                designation,
+                title,
+                content,
+                created_at
+
+            FROM announcements
+
+            WHERE designation = %s
+
+            ORDER BY created_at DESC
+
+            LIMIT 1;
+        """
+
+        cur.execute(
+            query,
+            (designation,)
+        )
+
+        result = cur.fetchone()
+
+        # ==========================================
+        # RETURN RESULT
+        # ==========================================
+
+        if result is None:
+            return None
+
+        return dict(result)
+
+    except Exception as error:
+
+        conn.rollback()
+
+        print(
+            "FETCH ANNOUNCEMENT ERROR:",
+            repr(error)
+        )
+
+        raise

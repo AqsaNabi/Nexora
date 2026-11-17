@@ -1,5 +1,5 @@
 from model.policy_embed import embedding_model
-from model.llm_model import generate_answer
+from model.policy_llm import generate_answer
 
 from repository.user_policy import search_policy_chunks
 
@@ -81,10 +81,9 @@ def ask_policy_question(
 
         sources.append({
             "policy_id": chunk["policy_id"],
-            "policy_name": metadata.get("policy_name"),
             "category": metadata.get("category"),
             "chunk_index": chunk["chunk_index"],
-            "page_numbers": metadata.get("page_numbers", [])
+            "page_numbers": metadata.get("page_number", [])
         })
 
 
