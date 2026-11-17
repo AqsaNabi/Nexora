@@ -91,7 +91,8 @@ Do not invent:
 
 If information is missing, use empty strings or empty lists.
 
-Improve grammar, clarity, structure, and professional presentation.
+Improve grammar, clarity, structure, and professional
+presentation.
 
 When HR requests a change, preserve all other correct information.
 
@@ -172,6 +173,181 @@ IMPORTANT RULES:
 
 14. Do not add generic technologies or tools that HR
     has not mentioned.
+
+==================================================
+B2. CONVERSATION CONTEXT AND FOLLOW-UP INSTRUCTIONS
+==================================================
+
+You must understand and remember the conversation context
+throughout the current job-post session.
+
+You will receive:
+
+1. Previous conversation messages.
+2. The latest saved job_post.
+3. The latest saved application_form.
+4. The latest HR message.
+
+Use ALL this information together.
+
+IMPORTANT:
+
+The latest saved drafts are the authoritative versions
+of the current job post and application form.
+
+Previous drafts in conversation history may be outdated.
+Never restore an older draft over a newer draft.
+
+Understand follow-up instructions such as:
+
+- Remove question 3.
+- Remove the last question.
+- Add another technical question.
+- Make that question optional.
+- Change its wording.
+- Change the job title.
+- Increase the experience requirement.
+- Add FastAPI to required skills.
+- Remove that skill.
+- Change the location.
+- Make the description shorter.
+- Change the form title.
+- Undo the previous change.
+
+REFERENCE UNDERSTANDING:
+
+1. Understand words such as "it", "that", "this",
+   "the previous one", "same question", and "the last one"
+   using the conversation and current drafts.
+
+2. When HR refers to a numbered question, use the actual
+   current application_form.questions list in its displayed
+   order, including standard fields if they are displayed.
+
+3. Do not assume question numbers refer only to dynamic
+   questions.
+
+4. Never remove or modify the four mandatory applicant fields.
+
+5. Preserve the standard parentage field in the form.
+   It is optional for applicants but should be included
+   in every generated application form.
+
+6. If HR refers to a question that does not exist, do not
+   invent a replacement.
+
+TARGETED MODIFICATIONS:
+
+1. Modify only the specific information HR requests.
+
+2. Preserve all unrelated job_post fields.
+
+3. Preserve all unrelated application_form questions.
+
+4. Preserve existing question field_name values unless
+   HR explicitly requests a change.
+
+5. Preserve question types, required status, options,
+   and validation unless the requested change requires
+   updating them.
+
+6. Do not regenerate unrelated content.
+
+7. Do not remove questions just because HR asks to modify
+   another question.
+
+8. Return the COMPLETE updated job_post and application_form,
+   not only the changed field.
+
+9. If HR asks to modify the application form, preserve the
+   existing job description.
+
+10. If HR asks to modify the job description, preserve the
+    existing application form.
+
+11. If HR asks to modify both, update both.
+
+12. Never claim that a change was made unless the returned
+    JSON actually contains that change.
+
+13. If the requested change cannot be made because it
+    conflicts with a mandatory rule, preserve the mandatory
+    rule and explain this briefly in the message field.
+
+CONTEXT PRIORITY:
+
+1. Latest HR instruction.
+2. Latest saved drafts.
+3. Original HR requirements.
+4. Relevant previous conversation messages.
+
+Never use an old instruction to override a newer instruction.
+
+==================================================
+B3. FORM QUESTION REQUESTS
+==================================================
+
+HR may request additional application form questions
+at any point in the conversation.
+
+Examples:
+
+- Add a question about parentage.
+- Add a question about father's name.
+- Add a question about mother's name.
+- Add a question about guardian details.
+- Add a question about notice period.
+- Add a question about work experience.
+- Add a question about technical skills.
+
+When HR requests a new question:
+
+1. Understand the requested subject using the conversation.
+
+2. If the requested subject is clear, create an appropriate
+   application form question.
+
+3. Create a meaningful lowercase snake_case field_name.
+
+4. Select an appropriate question type.
+
+5. Preserve all existing questions.
+
+6. Do not duplicate existing questions.
+
+7. Do not refuse ordinary application form question creation
+   without a valid reason.
+
+8. Do not invent a different question if the requested
+   subject is ambiguous.
+
+9. If the requested information is sensitive or unrelated
+   to recruitment, consider whether there is a legitimate
+   recruitment purpose. Do not make it mandatory without
+   HR explicitly requesting that.
+
+10. When processing a draft modification, ALWAYS return
+    the complete JSON response with action "draft".
+
+PARENTAGE FIELD:
+
+Parentage is a standard optional application form field.
+
+Include the following field in every application form:
+
+{
+    "field_name": "parentage",
+    "question": "Enter your father's, mother's, or guardian's name",
+    "type": "text",
+    "required": false,
+    "options": [],
+    "validation": {}
+}
+
+Do not omit this standard field when generating or modifying
+application forms.
+
+Do not make parentage mandatory by default.
 
 ==================================================
 C. COMPANY INFORMATION AND CONFIDENTIALITY
@@ -299,7 +475,27 @@ These four fields must always be included.
 
 Do not duplicate them if HR explicitly requests them.
 
-6. DYNAMIC JOB-SPECIFIC QUESTIONS
+6. STANDARD OPTIONAL PARENTAGE FIELD
+
+Every application form MUST also include this standard
+optional field:
+
+- field_name: parentage
+- question: Enter your father's, mother's, or guardian's name
+- type: text
+- required: false
+- options: []
+- validation: {}
+
+This is a standard field, not one of the four mandatory fields.
+
+Include it in every application form.
+
+Do not make it required by default.
+
+Do not duplicate it if HR explicitly requests it.
+
+7. DYNAMIC JOB-SPECIFIC QUESTIONS
 
 Generate additional questions based on the job role
 and HR requirements.
@@ -339,9 +535,9 @@ with relevant rules.
 Otherwise, use {}.
 
 Never invent job-specific questions that are unsupported
-by HR requirements, except for the four mandatory fields.
+by HR requirements, except for the standard fields.
 
-7. FIELD NAME CONSISTENCY
+8. FIELD NAME CONSISTENCY
 
 - Use lowercase snake_case field names.
 - Never duplicate field_name values.
@@ -349,7 +545,7 @@ by HR requirements, except for the four mandatory fields.
 - Use meaningful names for dynamic fields.
 - Do not use display questions as field names.
 
-8. ACCURACY
+9. ACCURACY
 
 - Never invent company information.
 - Never invent job requirements.
@@ -357,7 +553,7 @@ by HR requirements, except for the four mandatory fields.
 - Keep missing information empty.
 - Do not invent salary, benefits, options or qualifications.
 
-9. OUTPUT
+10. OUTPUT
 
 Return valid JSON only.
 Do not include Markdown code fences.
@@ -431,6 +627,14 @@ For generating or modifying drafts, return:
                 "validation": {
                     "accepted_file_types": ["pdf"]
                 }
+            },
+            {
+                "field_name": "parentage",
+                "question": "Enter your father's, mother's, or guardian's name",
+                "type": "text",
+                "required": false,
+                "options": [],
+                "validation": {}
             }
         ]
     }
@@ -492,6 +696,12 @@ def extract_json_content(content):
         )
 
     content = content.strip()
+
+    if not content:
+
+        raise ValueError(
+            "The AI returned an empty response."
+        )
 
     content = re.sub(
         r"^```(?:json)?\s*",
@@ -613,7 +823,6 @@ def validate_draft_response(data):
 
     validated_questions = []
 
-    # Canonical mandatory applicant fields.
     mandatory_fields = [
         {
             "field_name": "full_name",
@@ -651,17 +860,32 @@ def validate_draft_response(data):
         }
     ]
 
+    # Standard optional parentage field.
+    parentage_field = {
+        "field_name": "parentage",
+        "question": "Enter your father's, mother's, or guardian's name",
+        "type": "text",
+        "required": False,
+        "options": [],
+        "validation": {}
+    }
+
     mandatory_names = {
         field["field_name"]
         for field in mandatory_fields
     }
 
-    # Insert mandatory fields first.
+    standard_names = mandatory_names | {"parentage"}
+
+    # Always insert the four mandatory fields first.
     validated_questions.extend(mandatory_fields)
 
-    seen_field_names = set(mandatory_names)
+    # Insert parentage as a standard optional field.
+    validated_questions.append(parentage_field)
 
-    # Validate and append dynamic questions.
+    # Track all standard fields to prevent duplicates.
+    seen_field_names = set(standard_names)
+
     for question in questions:
 
         if not isinstance(question, dict):
@@ -677,11 +901,10 @@ def validate_draft_response(data):
         if not field_name:
             continue
 
-        # Do not duplicate mandatory fields.
-        if field_name in mandatory_names:
+        # Do not duplicate mandatory or standard fields.
+        if field_name in standard_names:
             continue
 
-        # Do not allow duplicate dynamic field names.
         if field_name in seen_field_names:
             continue
 
@@ -717,12 +940,17 @@ def validate_draft_response(data):
 
         seen_field_names.add(field_name)
 
+    message = data.get(
+        "message",
+        "Both drafts have been generated successfully."
+    )
+
+    if not isinstance(message, str):
+        message = "Both drafts have been generated successfully."
+
     return {
         "action": "draft",
-        "message": data.get(
-            "message",
-            "Both drafts have been generated successfully."
-        ),
+        "message": message,
         "job_post": validated_job_post,
         "application_form": {
             "form_title": form_title,
@@ -785,7 +1013,6 @@ def build_messages(
         SystemMessage(content=SYSTEM_PROMPT)
     ]
 
-    # Detect whether HR clicked Modify Draft.
     modification_mode = is_modification_request(
         conversation
     )
@@ -795,9 +1022,9 @@ def build_messages(
         messages.append(
             SystemMessage(
                 content="""
-IMPORTANT: MODIFICATION MODE IS ACTIVE.
+IMPORTANT: AUTOMATIC MODIFICATION MODE IS ACTIVE.
 
-HR has requested an automatic modification.
+HR has requested an automatic improvement of both drafts.
 
 You MUST:
 
@@ -805,48 +1032,46 @@ You MUST:
 2. Read the complete current application_form.
 3. Improve BOTH drafts.
 4. Return BOTH complete updated JSON objects.
-5. Do not return only the job description.
-6. Do not return only the application form.
-7. Preserve all correct HR-provided information.
-8. Improve wording, grammar, clarity, consistency,
+5. Preserve all correct HR-provided information.
+6. Improve wording, grammar, clarity, consistency,
    and professional presentation wherever needed.
-9. Do not invent missing information.
-10. Preserve all mandatory applicant fields.
-11. Do not simply return an empty draft.
+7. Do not invent missing information.
+8. Preserve all mandatory applicant fields.
+9. Preserve the standard optional parentage field.
+10. Do not return an empty draft.
 
 Your response action MUST be "draft".
-
-Return the complete updated job_post and application_form
-using the canonical JSON schema.
 """
             )
         )
 
-    # Include existing drafts as context.
-    if current_job_post or current_application_form:
+    # Find the latest user message.
+    latest_user_index = None
 
-        draft_context = {
-            "current_job_post": current_job_post or {},
-            "current_application_form": (
-                current_application_form or {}
-            )
-        }
+    for index in range(len(conversation) - 1, -1, -1):
 
-        messages.append(
-            HumanMessage(
-                content=(
-                    "CURRENT DRAFTS TO USE:\n"
-                    + json.dumps(
-                        draft_context,
-                        ensure_ascii=False,
-                        indent=2
-                    )
-                )
-            )
-        )
+        item = conversation[index]
 
-    # Include recent conversation history.
-    for item in conversation[-30:]:
+        if (
+            isinstance(item, dict)
+            and item.get("role") == "user"
+        ):
+            latest_user_index = index
+            break
+
+    # Keep the previous conversation, but do not include
+    # the latest user message yet.
+    if latest_user_index is not None:
+
+        previous_messages = conversation[
+            max(0, latest_user_index - 30):latest_user_index
+        ]
+
+    else:
+
+        previous_messages = conversation[-30:]
+
+    for item in previous_messages:
 
         if not isinstance(item, dict):
             continue
@@ -854,20 +1079,54 @@ using the canonical JSON schema.
         role = item.get("role", "user")
         content = item.get("content", "")
 
-        if not content:
+        if not isinstance(content, str) or not content.strip():
             continue
 
         if role == "assistant":
 
             messages.append(
-                AIMessage(content=str(content))
+                AIMessage(content=content)
             )
 
-        else:
+        elif role == "user":
 
             messages.append(
-                HumanMessage(content=str(content))
+                HumanMessage(content=content)
             )
+
+    # Always give the AI the latest saved drafts.
+    draft_context = {
+        "current_job_post": current_job_post or {},
+        "current_application_form": current_application_form or {}
+    }
+
+    messages.append(
+        HumanMessage(
+            content=(
+                "AUTHORITATIVE CURRENT DRAFTS:\n"
+                "The following are the latest saved versions. "
+                "Use these versions for every modification. "
+                "Do not restore older versions from conversation history.\n\n"
+                + json.dumps(
+                    draft_context,
+                    ensure_ascii=False,
+                    indent=2
+                )
+            )
+        )
+    )
+
+    # Add the latest user message LAST so the model
+    # understands what HR is asking right now.
+    if latest_user_index is not None:
+
+        latest_message = conversation[latest_user_index]
+
+        latest_content = latest_message.get("content", "")
+
+        messages.append(
+            HumanMessage(content=latest_content)
+        )
 
     return messages
 
@@ -897,9 +1156,38 @@ def generate_ai_response(
 
         response = llm.invoke(messages)
 
-        ai_response = extract_json_content(
-            response.content
-        )
+        print("\n========== RAW AI RESPONSE ==========")
+        print(repr(response.content))
+        print("=====================================\n")
+
+        # ------------------------------------------
+        # EXTRACT JSON
+        # ------------------------------------------
+
+        try:
+
+            ai_response = extract_json_content(
+                response.content
+            )
+
+        except ValueError as json_error:
+
+            # If the model returns plain text instead of JSON,
+            # display that text as a normal answer.
+            # Do not overwrite the current drafts.
+
+            content = response.content
+
+            if isinstance(content, str) and content.strip():
+
+                if "No valid JSON object" in str(json_error):
+
+                    return {
+                        "action": "answer",
+                        "answer": content.strip()
+                    }
+
+            raise
 
         action = ai_response.get("action")
 

@@ -1,6 +1,4 @@
 
-import json
-
 from backend.services.ai_service import generate_ai_response
 
 from backend.services.job_post_service import (
@@ -77,6 +75,10 @@ class ChatService:
                     "content": answer
                 })
 
+                # IMPORTANT:
+                # Do not clear or overwrite the previously
+                # generated drafts when answering a question.
+
                 return {
                     "type": "response",
                     "data": {
@@ -111,19 +113,13 @@ class ChatService:
                     "Both drafts have been generated successfully."
                 )
 
+                # Save a short assistant message.
+                # The complete latest drafts are passed separately
+                # to the AI on the next message.
+
                 self.conversation.append({
                     "role": "assistant",
-                    "content": (
-                        assistant_message
-                        + "\n\nUpdated drafts:\n"
-                        + json.dumps(
-                            {
-                                "job_post": job_post,
-                                "application_form": application_form
-                            },
-                            ensure_ascii=False
-                        )
-                    )
+                    "content": assistant_message
                 })
 
                 return {
@@ -142,7 +138,11 @@ class ChatService:
 
         except Exception as error:
 
-            if self.conversation:
+            # Remove the failed user message from history.
+            if (
+                self.conversation
+                and self.conversation[-1].get("role") == "user"
+            ):
                 self.conversation.pop()
 
             print("CHAT SERVICE ERROR:", str(error))
@@ -185,6 +185,16 @@ class ChatService:
         self.is_approved = False
         self.approved_payload = None
         self.approved_file = None
+
+        # Record that the drafts were manually updated.
+        self.conversation.append({
+            "role": "assistant",
+            "content": (
+                "The current job post and application form "
+                "were updated through the JSON editor. "
+                "Use the latest saved drafts for future changes."
+            )
+        })
 
         return {
             "job_post": self.current_job_post,
