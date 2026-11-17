@@ -9,7 +9,7 @@ from model.announcement_agent import  generate_announcement, modify_announcement
    
 
 
-from repository.announcement import save_announcement
+from repository.announcement import save_announcement,fetch_latest_announcement
 
 from database.concect import cur, conn
 
@@ -602,3 +602,26 @@ def approve_announcement(
         "saved": True
 
     }
+# ==========================================
+# Get Latest Announcement
+# ==========================================
+
+def get_latest_announcement(designation: str):
+
+    if not designation or not designation.strip():
+        raise ValueError("Designation cannot be empty.")
+
+    designation = designation.strip()
+
+    result = fetch_latest_announcement(
+        designation=designation
+    )
+
+    if not result:
+        return {
+            "designation": designation,
+            "announcement": None,
+            "message": "No announcements found for this designation."
+        }
+
+    return result

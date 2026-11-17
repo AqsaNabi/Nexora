@@ -51,5 +51,3 @@ class BedrockEmbeddings:
 
 
 embedding_model = BedrockEmbeddings()
-embeddings = embedding_model.embed_documents(["Hello, world!", "This is a test."])
-print(embeddings)

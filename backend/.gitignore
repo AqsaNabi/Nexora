@@ -7,7 +7,7 @@ venv/
 
 # Python cache
 __pycache__/
-*.py[cod]
+*.py[cod] 
 
 # Environment variables
 .env

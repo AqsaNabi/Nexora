@@ -1,29 +1,21 @@
 
-from fastapi import APIRouter, UploadFile, File,Form, HTTPException
-from pydantic import BaseModel
-
+from fastapi import APIRouter, Form, File, UploadFile
 from services.policy import upload_policy
 
 router = APIRouter(
     prefix="/policies",
-    tags=["HR Policy Management"]
+    tags=["Employee Policy Assistant"]
 )
-
-
-
-    
-
+ 
 
 @router.post("/upload")
-def upload_policy_route(
-    policy_name: str = Form(...),
-    description: str = Form(...),       
+async def upload_policy_route(
+    description: str = Form(...),
     category: str = Form(...),
     file: UploadFile = File(...)
 ):
 
-    result = upload_policy(
-        policy_name=policy_name,
+    result = await upload_policy(
         description=description,
         category=category,
         file=file
