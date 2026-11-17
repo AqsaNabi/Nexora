@@ -2,6 +2,9 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any
+from fastapi.responses import Response
+
+from services.ats_service import get_candidate_resume
 
 from services.ats_service import (
     get_dashboard_data,
@@ -102,4 +105,35 @@ def submit_application(
         raise HTTPException(
             status_code=500,
             detail=f"Database error: {str(error)}"
+        )
+
+# =========================================================
+# 6. VIEW CANDIDATE RESUME
+# =========================================================
+
+@router.get("/api/ats/applications/{application_id}/resume")
+def view_candidate_resume(application_id: int):
+
+    try:
+
+        resume = get_candidate_resume(application_id)
+
+        return Response(
+            content=resume["resume_file"],
+            media_type=resume["resume_content_type"],
+            headers={
+                "Content-Disposition": (
+                    f'inline; filename="{resume["resume_filename"]}"'
+                )
+            }
+        )
+
+    except HTTPException:
+        raise
+
+    except Exception as error:
+
+        raise HTTPException(
+            status_code=500,
+            detail=f"Resume retrieval error: {str(error)}"
         )

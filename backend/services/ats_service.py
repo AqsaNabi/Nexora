@@ -135,6 +135,7 @@ def get_applications_data(post_id: str):
                 phone,
                 resume_filename,
                 resume_content_type,
+                (resume_file IS NOT NULL) AS has_resume,
                 additional_data,
                 submitted_at,
                 candidate_score
@@ -273,6 +274,58 @@ def submit_application_data(
             connection.rollback()
 
         raise
+
+    finally:
+
+        if cursor:
+            cursor.close()
+
+        if connection:
+            connection.close()
+
+# =========================================================
+# 5. GET CANDIDATE RESUME
+# =========================================================
+
+def get_candidate_resume(application_id: int):
+
+    connection = None
+    cursor = None
+
+    try:
+
+        connection = get_recruitment_connection()
+
+        cursor = connection.cursor(
+            cursor_factory=RealDictCursor
+        )
+
+        cursor.execute("""
+            SELECT
+                resume_file,
+                resume_filename,
+                resume_content_type
+
+            FROM recruitment_data
+
+            WHERE application_id = %s;
+        """, (application_id,))
+
+        resume = cursor.fetchone()
+
+        if resume is None:
+            raise HTTPException(
+                status_code=404,
+                detail="Candidate application not found"
+            )
+
+        if not resume["resume_file"]:
+            raise HTTPException(
+                status_code=404,
+                detail="No resume has been added"
+            )
+
+        return dict(resume)
 
     finally:
 
