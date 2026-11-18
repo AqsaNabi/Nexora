@@ -3,14 +3,37 @@ import json
 from datetime import datetime
 
 from backend.database.recruitment_db import get_recruitment_connection
+
 from backend.services.google_form_service import get_forms_service
+
+from backend.repository.recruitment_repository import (
+    get_job_description
+)
+
+from backend.services.google_drive_service import (
+    download_resume_from_drive
+)
+
+from backend.services.resume_parser_service import (
+    extract_resume_text
+)
+
+from backend.services.candidate_evaluation_service import (
+    evaluate_candidate
+)
 
 
 def _answer_value(answer):
     """Extract answer values from a Google Forms response."""
-    text_answers = answer.get("textAnswers", {}).get("answers", [])
 
-    values = [item.get("value", "") for item in text_answers]
+    text_answers = answer.get(
+        "textAnswers", {}
+    ).get("answers", [])
+
+    values = [
+        item.get("value", "")
+        for item in text_answers
+    ]
 
     if not values:
         return None
@@ -19,15 +42,17 @@ def _answer_value(answer):
 
 
 def _get_form_metadata(form_id):
+
     connection = get_recruitment_connection()
 
     try:
         with connection.cursor() as cursor:
+
             cursor.execute(
                 """
                 SELECT post_id, question_mapping
                 FROM recruitment_metadata
-                WHERE form_id = %s
+                WHERE form_id = %s;
                 """,
                 (form_id,)
             )
@@ -50,11 +75,19 @@ def _get_form_metadata(form_id):
         connection.close()
 
 
-def _save_applicant(form_id, response, post_id, question_mapping):
+def _save_applicant(
+    form_id,
+    response,
+    post_id,
+    question_mapping
+):
+
     response_id = response.get("responseId")
 
     if not response_id:
-        raise ValueError("Google Forms response has no responseId")
+        raise ValueError(
+            "Google Forms response has no responseId"
+        )
 
     answers = response.get("answers", {})
 
@@ -64,9 +97,12 @@ def _save_applicant(form_id, response, post_id, question_mapping):
         "phone": None
     }
 
+    resume_link = None
     additional_data = {}
 
+    # Extract applicant information.
     for question_id, answer in answers.items():
+
         field_name = question_mapping.get(question_id)
 
         if not field_name:
@@ -76,28 +112,77 @@ def _save_applicant(form_id, response, post_id, question_mapping):
 
         if field_name in applicant:
             applicant[field_name] = value
+
+        elif field_name == "resume_link":
+            resume_link = value
+
         elif field_name != "resume_file":
             additional_data[field_name] = value
 
     if not applicant["full_name"] or not applicant["email"]:
         raise ValueError(
-            f"Required applicant details missing in response {response_id}. "
-            "Check the question_mapping."
+            f"Required applicant details missing: {response_id}"
         )
 
+    if not resume_link:
+        raise ValueError(
+            f"Resume link missing for response {response_id}"
+        )
+
+    # Get the job description.
+    job_description = get_job_description(post_id)
+
+    if not job_description:
+        raise ValueError(
+            f"Job description not found for post {post_id}"
+        )
+
+    # Download resume from Google Drive.
+    resume_content, resume_filename, resume_content_type = (
+        download_resume_from_drive(resume_link)
+    )
+
+    if not resume_content:
+        raise ValueError(
+            f"Could not download resume for {applicant['email']}"
+        )
+
+    # Extract resume text.
+    resume_text = extract_resume_text(
+        resume_content,
+        resume_filename,
+        resume_content_type
+    )
+
+    if not resume_text:
+        raise ValueError(
+            f"Could not extract resume text for {applicant['email']}"
+        )
+
+    # Evaluate candidate using Bedrock.
+    candidate_score = evaluate_candidate(
+        job_description=job_description,
+        resume_text=resume_text,
+        application_answers=additional_data
+    )
+
+    # Save applicant, resume and score in one transaction.
     connection = get_recruitment_connection()
 
     try:
         with connection.cursor() as cursor:
 
-            # Prevent duplicate applications.
+            # Prevent duplicate processing.
             cursor.execute(
                 """
-                INSERT INTO recruitment_processed_responses
-                    (form_id, response_id)
+                INSERT INTO recruitment_processed_responses (
+                    form_id,
+                    response_id
+                )
                 VALUES (%s, %s)
-                ON CONFLICT (form_id, response_id) DO NOTHING
-                RETURNING response_id
+                ON CONFLICT (form_id, response_id)
+                DO NOTHING
+                RETURNING response_id;
                 """,
                 (form_id, response_id)
             )
@@ -106,7 +191,11 @@ def _save_applicant(form_id, response, post_id, question_mapping):
 
             if not inserted:
                 connection.rollback()
-                print(f"Duplicate response ignored: {response_id}")
+
+                print(
+                    f"Duplicate response ignored: {response_id}"
+                )
+
                 return False
 
             submitted_at = response.get("lastSubmittedTime")
@@ -123,18 +212,31 @@ def _save_applicant(form_id, response, post_id, question_mapping):
                     full_name,
                     email,
                     phone,
+                    resume_file,
+                    resume_filename,
+                    resume_content_type,
                     additional_data,
-                    submitted_at
+                    submitted_at,
+                    candidate_score
                 )
-                VALUES (%s, %s, %s, %s, %s, COALESCE(%s, CURRENT_TIMESTAMP))
+                VALUES (
+                    %s, %s, %s, %s, %s,
+                    %s, %s, %s::jsonb,
+                    COALESCE(%s, CURRENT_TIMESTAMP),
+                    %s
+                );
                 """,
                 (
                     post_id,
                     applicant["full_name"],
                     applicant["email"],
                     applicant["phone"],
+                    resume_content,
+                    resume_filename,
+                    resume_content_type,
                     json.dumps(additional_data),
-                    submitted_at
+                    submitted_at,
+                    candidate_score
                 )
             )
 
@@ -142,7 +244,7 @@ def _save_applicant(form_id, response, post_id, question_mapping):
 
         print(
             f"Applicant saved: {applicant['email']} "
-            f"for {post_id}"
+            f"| Score: {candidate_score}"
         )
 
         return True
@@ -166,6 +268,7 @@ def process_form_responses(form_id):
     saved_count = 0
 
     while True:
+
         request_args = {
             "formId": form_id,
             "pageSize": 500
@@ -179,6 +282,7 @@ def process_form_responses(form_id):
         ).execute()
 
         for response in result.get("responses", []):
+
             if _save_applicant(
                 form_id,
                 response,

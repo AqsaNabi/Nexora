@@ -4,7 +4,7 @@ import json
 from backend.database.recruitment_db import get_recruitment_connection
 
 
-def create_recruitment_post(job_description):
+def create_recruitment_post(job_title, job_description):
     connection = None
     cursor = None
 
@@ -14,25 +14,33 @@ def create_recruitment_post(job_description):
 
         cursor.execute(
             """
-            INSERT INTO recruitment_posts (job_description)
-            VALUES (%s)
+            INSERT INTO recruitment_posts (
+                job_title,
+                job_description
+            )
+            VALUES (%s, %s)
             RETURNING post_id;
             """,
-            (job_description,)
+            (job_title, job_description)
         )
 
         post_id = cursor.fetchone()[0]
         connection.commit()
+
         return post_id
 
     except Exception as error:
         if connection:
             connection.rollback()
-        raise Exception(f"Failed to create recruitment post: {error}")
+
+        raise Exception(
+            f"Failed to create recruitment post: {error}"
+        )
 
     finally:
         if cursor:
             cursor.close()
+
         if connection:
             connection.close()
 
@@ -55,8 +63,12 @@ def save_recruitment_metadata(
         cursor.execute(
             """
             INSERT INTO recruitment_metadata (
-                post_id, form_id, form_url, image_urls,
-                question_mapping, application_form
+                post_id,
+                form_id,
+                form_url,
+                image_urls,
+                question_mapping,
+                application_form
             )
             VALUES (%s, %s, %s, %s::jsonb, %s::jsonb, %s::jsonb)
             RETURNING metadata_id;
@@ -73,16 +85,21 @@ def save_recruitment_metadata(
 
         metadata_id = cursor.fetchone()[0]
         connection.commit()
+
         return metadata_id
 
     except Exception as error:
         if connection:
             connection.rollback()
-        raise Exception(f"Failed to save recruitment metadata: {error}")
+
+        raise Exception(
+            f"Failed to save recruitment metadata: {error}"
+        )
 
     finally:
         if cursor:
             cursor.close()
+
         if connection:
             connection.close()
 
@@ -97,8 +114,14 @@ def get_recruitment_post(post_id):
 
         cursor.execute(
             """
-            SELECT p.post_id, p.job_description, m.form_id,
-                   m.form_url, m.image_urls, m.created_at
+            SELECT
+                p.post_id,
+                p.job_title,
+                p.job_description,
+                m.form_id,
+                m.form_url,
+                m.image_urls,
+                m.created_at
             FROM recruitment_posts p
             LEFT JOIN recruitment_metadata m
                 ON p.post_id = m.post_id
@@ -114,19 +137,57 @@ def get_recruitment_post(post_id):
 
         return {
             "post_id": result[0],
-            "job_description": result[1],
-            "form_id": result[2],
-            "form_url": result[3],
-            "image_urls": result[4],
-            "created_at": result[5]
+            "job_title": result[1],
+            "job_description": result[2],
+            "form_id": result[3],
+            "form_url": result[4],
+            "image_urls": result[5],
+            "created_at": result[6]
         }
 
     except Exception as error:
-        raise Exception(f"Failed to retrieve recruitment post: {error}")
+        raise Exception(
+            f"Failed to retrieve recruitment post: {error}"
+        )
 
     finally:
         if cursor:
             cursor.close()
+
+        if connection:
+            connection.close()
+
+
+def get_job_description(post_id):
+    connection = None
+    cursor = None
+
+    try:
+        connection = get_recruitment_connection()
+        cursor = connection.cursor()
+
+        cursor.execute(
+            """
+            SELECT job_description
+            FROM recruitment_posts
+            WHERE post_id = %s;
+            """,
+            (post_id,)
+        )
+
+        result = cursor.fetchone()
+
+        return result[0] if result else None
+
+    except Exception as error:
+        raise Exception(
+            f"Failed to retrieve job description: {error}"
+        )
+
+    finally:
+        if cursor:
+            cursor.close()
+
         if connection:
             connection.close()
 
@@ -141,9 +202,17 @@ def get_applicants_by_post(post_id):
 
         cursor.execute(
             """
-            SELECT application_id, post_id, full_name, email, phone,
-                   resume_filename, resume_content_type,
-                   additional_data, submitted_at
+            SELECT
+                application_id,
+                post_id,
+                full_name,
+                email,
+                phone,
+                resume_filename,
+                resume_content_type,
+                additional_data,
+                submitted_at,
+                candidate_score
             FROM recruitment_data
             WHERE post_id = %s
             ORDER BY submitted_at DESC;
@@ -163,17 +232,21 @@ def get_applicants_by_post(post_id):
                 "resume_filename": row[5],
                 "resume_content_type": row[6],
                 "additional_data": row[7],
-                "submitted_at": row[8]
+                "submitted_at": row[8],
+                "candidate_score": row[9]
             }
             for row in rows
         ]
 
     except Exception as error:
-        raise Exception(f"Failed to retrieve applicants: {error}")
+        raise Exception(
+            f"Failed to retrieve applicants: {error}"
+        )
 
     finally:
         if cursor:
             cursor.close()
+
         if connection:
             connection.close()
 
@@ -192,7 +265,6 @@ def attach_resume_to_applicant(
         connection = get_recruitment_connection()
         cursor = connection.cursor()
 
-        # Find the applicant for this specific recruitment post.
         cursor.execute(
             """
             SELECT application_id
@@ -225,7 +297,6 @@ def attach_resume_to_applicant(
 
         application_id = applicants[0][0]
 
-        # Do not silently overwrite an already uploaded resume.
         cursor.execute(
             """
             SELECT resume_file
@@ -240,7 +311,9 @@ def attach_resume_to_applicant(
         if existing_resume is not None:
             return {
                 "success": False,
-                "message": "A resume has already been uploaded for this application."
+                "message": (
+                    "A resume has already been uploaded for this application."
+                )
             }
 
         cursor.execute(
@@ -275,5 +348,6 @@ def attach_resume_to_applicant(
     finally:
         if cursor:
             cursor.close()
+
         if connection:
             connection.close()

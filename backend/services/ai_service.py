@@ -519,15 +519,11 @@ def generate_ai_response(conversation):
         build_conversation_messages(conversation)
     )
 
-    print("\n========== RAW AI RESPONSE ==========")
-    print(response.content)
-    print("====================================\n")
+
 
     result = extract_json(response.content)
 
-    print("\n========== PARSED AI JSON ==========")
-    print(json.dumps(result, indent=4))
-    print("====================================\n")
+
 
     result = validate_ai_response(result)
 
