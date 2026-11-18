@@ -1,8 +1,7 @@
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-
-from routes.ats_router import router as ats_router
+from routes.detail_router import router as ats_router
 
 
 # =========================================================

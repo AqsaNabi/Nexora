@@ -3,7 +3,7 @@ import streamlit as st
 import pandas as pd
 import html
 
-from dashboard_functions import (
+from detail_dash_func import (
     fetch_dashboard_data,
     fetch_applications
 )
