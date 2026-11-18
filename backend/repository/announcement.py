@@ -123,6 +123,7 @@ def fetch_latest_announcement(designation):
             FROM announcements
 
             WHERE designation = %s
+            or designation='Employee'
 
             ORDER BY created_at DESC
 

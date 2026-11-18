@@ -1,12 +1,16 @@
 from typing import Optional
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from authen.auth import verify_token
 from pydantic import BaseModel
 from services.user_policy import ask_policy_question
 
 router = APIRouter(
     prefix="/user/policies",
-    tags=["Employee Policy Assistant"]
+    tags=["Employee Policy Assistant"],
+    dependencies=[Depends(verify_token)]
 )
+    
+
 
 
 class PolicyQuestionRequest(BaseModel):
