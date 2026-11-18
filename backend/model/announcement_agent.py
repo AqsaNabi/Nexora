@@ -1,224 +1,144 @@
 
 import os
-from langchain_openai import ChatOpenAI
+
 from dotenv import load_dotenv
-
-from langchain_ollama import ChatOllama
-
-from langchain_core.prompts import ChatPromptTemplate
-
+from openai import OpenAI
 
 load_dotenv()
 
 
-# ==========================================
-# INITIALIZE OLLAMA
-# ==========================================
+# =====================================================
+# BEDROCK CLIENT
+# =====================================================
 
-llm = ChatOpenAI(
-    model="gemma4:31b",
-    base_url="https://ollama.com/v1",
-    api_key=os.getenv("OLLAMA_API_KEY"),
-    temperature=0.7,
-
-    
-
+client = OpenAI(
+    api_key=os.getenv("BEDROCK_API_KEY"),
+    base_url=os.getenv("BEDROCK_BASE_URL")
 )
 
 
-# ==========================================
-# GENERATE ANNOUNCEMENT PROMPT
-# ==========================================
+# =====================================================
+# BEDROCK LLM FUNCTION
+# =====================================================
 
-announcement_prompt = ChatPromptTemplate.from_messages(
+def call_bedrock(system_prompt: str, user_prompt: str):
 
-    [
+    model_id = os.getenv("BEDROCK_MODEL")
 
-        (
+    if not model_id:
+        raise ValueError("BEDROCK_MODEL is missing in .env")
 
-            "system",
+    response = client.chat.completions.create(
+        model=model_id,
+        messages=[
+            {
+                "role": "system",
+                "content": system_prompt
+            },
+            {
+                "role": "user",
+                "content": user_prompt
+            }
+        ],
+        temperature=0.7,
+        max_tokens=1500
+    )
 
-            """
-            You are an intelligent HR announcement
-            generation agent.
-
-            Generate attractive, professional,
-            engaging and clear company announcements.
-
-            Requirements:
-
-            1. Use a professional and engaging tone.
-            2. Address the selected audience correctly.
-            3. Include the details provided by HR.
-            4. Create an attractive announcement title.
-            5. Use appropriate emojis when useful.
-            6. Include a clear call to action.
-            7. Do not invent dates, locations,
-               links or event information.
-            8. Use only the information provided.
-            9. Do not add unsupported details.
-
-            Audience greetings:
-
-            Managers:
-            Dear Managers,
-
-            Team Leaders:
-            Dear Team Leaders,
-
-            All Employees:
-            Dear Employees,
-
-            Return the announcement in this format:
-
-            TITLE:
-            ANNOUNCEMENT:
-
-            Return the complete announcement
-            suitable for an HR email.
-            """
-
-        ),
-
-        (
-
-            "human",
-
-            """
-            Selected audience:
-            {designation}
-
-            HR prompt:
-            {prompt}
-
-            Generate the announcement.
-            """
-
-        )
-
-    ]
-
-)
+    return response.choices[0].message.content.strip()
 
 
-# ==========================================
-# MODIFY ANNOUNCEMENT PROMPT
-# ==========================================
-
-modify_prompt = ChatPromptTemplate.from_messages(
-
-    [
-
-        (
-
-            "system",
-
-            """
-            You are an HR announcement modification agent.
-
-            Modify the existing announcement according
-            to HR's instructions.
-
-            Requirements:
-
-            1. Preserve existing important details.
-            2. Apply the requested modifications.
-            3. Keep the announcement professional.
-            4. Keep the announcement engaging.
-            5. Never invent missing information.
-            6. Do not remove important details unless
-               HR explicitly requests it.
-            7. Return the complete revised announcement.
-
-            Return:
-
-            TITLE:
-            ANNOUNCEMENT:
-            """
-
-        ),
-
-        (
-
-            "human",
-
-            """
-            Selected audience:
-            {designation}
-
-            Existing announcement:
-            {announcement}
-
-            HR modification instructions:
-            {modification_prompt}
-
-            Generate the revised announcement.
-            """
-
-        )
-
-    ]
-
-)
-
-
-# ==========================================
+# =====================================================
 # GENERATE ANNOUNCEMENT
-# ==========================================
+# =====================================================
 
 def generate_announcement(
-
     prompt: str,
-
     designation: str
-
 ):
 
-    chain = announcement_prompt | llm
+    system_prompt = """
+You are an intelligent HR announcement generation agent.
 
-    response = chain.invoke(
+Generate attractive, professional, engaging and clear
+company announcements.
 
-        {
+Requirements:
 
-            "prompt": prompt,
+1. Use a professional and engaging tone.
+2. Address the selected audience appropriately.
+3. Include the details provided by HR.
+4. Create an attractive announcement title.
+5. Use appropriate emojis when useful.
+6. Include a clear call to action.
+7. Do not invent dates, locations, links or event information.
+8. Use only the information provided.
+9. Do not add unsupported details.
 
-            "designation": designation
+Return the announcement in this format:
 
-        }
+TITLE:
+ANNOUNCEMENT:
 
-    )
+Return the complete announcement suitable for an HR email.
+"""
 
-    return response.content
+    user_prompt = f"""
+Selected audience:
+{designation}
+
+HR prompt:
+{prompt}
+
+Generate the announcement.
+"""
+
+    return call_bedrock(system_prompt, user_prompt)
 
 
-# ==========================================
+# =====================================================
 # MODIFY ANNOUNCEMENT
-# ==========================================
+# =====================================================
 
 def modify_announcement(
-
     announcement: str,
-
     modification_prompt: str,
-
     designation: str
-
 ):
 
-    chain = modify_prompt | llm
+    system_prompt = """
+You are an HR announcement modification agent.
 
-    response = chain.invoke(
+Modify the existing announcement according
+to HR's instructions.
 
-        {
+Requirements:
 
-            "announcement": announcement,
+1. Preserve existing important details.
+2. Apply the requested modifications.
+3. Keep the announcement professional.
+4. Keep the announcement engaging.
+5. Never invent missing information.
+6. Do not remove important details unless
+   HR explicitly requests it.
+7. Return the complete revised announcement.
 
-            "modification_prompt": modification_prompt,
+Return:
 
-            "designation": designation
+TITLE:
+ANNOUNCEMENT:
+"""
 
-        }
+    user_prompt = f"""
+Selected audience:
+{designation}
 
-    )
+Existing announcement:
+{announcement}
 
-    return response.content
+HR modification instructions:
+{modification_prompt}
+
+Generate the revised announcement.
+"""
+
+    return call_bedrock(system_prompt, user_prompt)
