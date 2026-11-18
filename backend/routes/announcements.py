@@ -16,7 +16,7 @@ from services.announcements import  create_announcement, update_announcement,app
 # ==========================================
 router = APIRouter(
     prefix="/announcements",
-    tags=["Announcements"]
+    tags=["Announcements"],dependencies=[Depends(verify_token)]
 )
 
 

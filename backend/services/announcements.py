@@ -1,5 +1,7 @@
 
+import os
 import smtplib
+from dotenv import load_dotenv
 
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -13,20 +15,21 @@ from repository.announcement import save_announcement,fetch_latest_announcement
 
 from database.concect import cur, conn
 
-
+load_dotenv()
 # ==========================================
 # EMAIL CONFIGURATION
 # ==========================================
 
 # Use your complete Gmail address
-sender_email = "salifsajad1@gmail.com"
+sender_email = os.getenv("EMAIL_ADDRESS")
+
 
 # Use your NEW Google App Password
-sender_password = "dfbo rnfz mxxc"
+sender_password = os.getenv("EMAIL_PASSWORD")
 
-smtp_server = "smtp.gmail.com"
+smtp_server=os.getenv("SMTP_SERVER")
 
-smtp_port = 587
+smtp_port = os.getenv("SMTP_PORT")
 
 
 # ==========================================
@@ -35,11 +38,12 @@ smtp_port = 587
 
 ALLOWED_DESIGNATIONS = [
 
-    "Managers",
+    "Manager",
 
-    "Team Leaders",
+    "Team Lead",
 
-    "All Employees"
+    "Employee",
+
 
 ]
 
@@ -208,15 +212,14 @@ def get_recipients(designation):
         # ALL EMPLOYEES
         # -------------------------------------
 
-        if designation == "All Employees":
+        if designation == "Employee":
 
             query = """
 
                 SELECT full_name, email
-
                 FROM register
-
-                WHERE email IS NOT NULL
+            WHERE email IS NOT NULL
+              AND designation <> 'hr';
 
                 
 
@@ -228,7 +231,7 @@ def get_recipients(designation):
         # MANAGERS
         # -------------------------------------
 
-        elif designation == "Managers":
+        elif designation == "Manager":
 
             query = """
 
@@ -241,6 +244,7 @@ def get_recipients(designation):
                 IN (
 
                     'manager',
+                    'Manager',
 
                     'managers'
 
@@ -258,7 +262,7 @@ def get_recipients(designation):
         # TEAM LEADERS
         # -------------------------------------
 
-        elif designation == "Team Leaders":
+        elif designation == "Team Lead":
 
             query = """
 

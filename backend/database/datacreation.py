@@ -106,3 +106,13 @@ CREATE TABLE IF NOT EXISTS policy_chunks (
 cur.execute(q)
 conn.commit()
 print("Policy Chunks Table created successfully")
+q = """
+select * from announcements
+    
+"""
+
+result=cur.execute(q)
+conn.commit()
+print(result)
+
+

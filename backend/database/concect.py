@@ -1,10 +1,10 @@
 
 import psycopg2
 from psycopg2.extras import RealDictCursor
-
-
-
-DATABASE_URL = "postgresql://root:yJGhhpuHeBL79s9n2vmc3ENk2w8ZrIJs@dpg-dbrasvdbedkc73d2l2bg-a.oregon-postgres.render.com/nexora_database_z4z0"
+import os
+from dotenv import load_dotenv
+load_dotenv()
+DATABASE_URL = os.getenv("DATABASE_URL")
 
 try:
     conn = psycopg2.connect(

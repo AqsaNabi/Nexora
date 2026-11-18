@@ -1,10 +1,13 @@
 
-from fastapi import APIRouter, Form, File, UploadFile
+from fastapi import APIRouter, Form, File, UploadFile,Depends
+from authen.auth import verify_token
 from services.policy import upload_policy
 
 router = APIRouter(
     prefix="/policies",
-    tags=["Employee Policy Assistant"]
+    tags=["Employee Policy Assistant"],
+    dependencies=[Depends(verify_token)]
+
 )
  
 
