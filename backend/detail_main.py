@@ -1,7 +1,7 @@
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routes.detail_router import router as ats_router
+from backend.routes.detail_router import router as ats_router
 
 
 # =========================================================

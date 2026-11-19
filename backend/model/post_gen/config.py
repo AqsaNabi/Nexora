@@ -1,56 +1,30 @@
-
 import os
 from pathlib import Path
 from dotenv import load_dotenv
 
 
-# ============================================================
-# ENVIRONMENT CONFIGURATION
-# ============================================================
+# Get the project root directory
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
-POST_GEN_FOLDER = Path(__file__).resolve().parent
+# Locate the root .env file
+ENV_FILE = PROJECT_ROOT / ".env"
 
-ENV_FILE = POST_GEN_FOLDER / ".env"
+# Load environment variables
+load_dotenv(dotenv_path=ENV_FILE, override=False)
 
-load_dotenv(ENV_FILE, override=True)
 
-
-# ============================================================
-# AWS BEDROCK CONFIGURATION
-# ============================================================
-
+# Bedrock configuration
 BEDROCK_API_KEY = os.getenv("BEDROCK_API_KEY")
-
-BEDROCK_BASE_URL = os.getenv(
-    "BEDROCK_BASE_URL",
-    "https://bedrock-mantle.us-east-1.api.aws/v1"
-)
-
-BEDROCK_MODEL = os.getenv(
-    "BEDROCK_MODEL",
-    "openai.gpt-oss-20b"
-)
+BEDROCK_BASE_URL = os.getenv("BEDROCK_BASE_URL")
+BEDROCK_MODEL = os.getenv("BEDROCK_MODEL")
 
 
-# ============================================================
-# VALIDATE CONFIGURATION
-# ============================================================
-
+# Validate configuration
 if not BEDROCK_API_KEY:
-
-    raise ValueError(
-        f"BEDROCK_API_KEY is missing. "
-        f"Please check your environment file: {ENV_FILE}"
-    )
+    raise ValueError("BEDROCK_API_KEY is missing from the project root .env")
 
 if not BEDROCK_BASE_URL:
-
-    raise ValueError(
-        "BEDROCK_BASE_URL is missing."
-    )
+    raise ValueError("BEDROCK_BASE_URL is missing from the project root .env")
 
 if not BEDROCK_MODEL:
-
-    raise ValueError(
-        "BEDROCK_MODEL is missing."
-    )
+    raise ValueError("BEDROCK_MODEL is missing from the project root .env")

@@ -3,8 +3,8 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any
 from fastapi.responses import Response
-from repository.recruit_repo import get_candidate_resume
-from repository.recruit_repo import  (
+from backend.repository.recruit_repo import get_candidate_resume
+from backend.repository.recruit_repo import  (
     get_dashboard_data,
     get_applications_data,
     submit_application_data

@@ -1,7 +1,7 @@
 
 from fastapi import HTTPException
 
-from database.recruitment_db import get_recruitment_connection
+from backend.database.recruitment_db import get_recruitment_connection
 
 from psycopg2.extras import RealDictCursor, Json
 
@@ -50,7 +50,7 @@ def get_dashboard_data():
                 rp.job_title,
                 rp.job_description,
                 TO_CHAR(
-                    rp.created_at,
+                    rm.created_at,
                     'DD-MM-YYYY'
                 ) AS job_posted_date,
                 rm.metadata_id,
