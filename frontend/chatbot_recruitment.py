@@ -425,3 +425,4 @@ def chatbot_recruitment_function():
     if __name__ == "__main__":
         job_post_generator()
         
+        
