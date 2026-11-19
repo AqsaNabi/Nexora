@@ -1,4 +1,6 @@
 
+import json
+
 from backend.services.ai_service import generate_ai_response
 
 from backend.services.job_post_service import (
@@ -11,246 +13,213 @@ class ChatService:
 
     def __init__(self):
 
+        # Conversation history
         self.conversation = []
 
-        self.current_job_post = {}
-        self.current_application_form = {}
+        # Current generated drafts
+        self.current_job_post = None
+        self.current_application_form = None
 
-        self.is_approved = False
+        # Approval status
+        self.job_post_approved = False
+        self.application_form_approved = False
 
+        # Recruitment post and Google Form details
+        self.created_post_id = None
+        self.created_form_id = None
+        self.created_form_url = None
+
+        # Google Form question mapping
+        self.question_mapping = None
+
+        # Approved recruitment data
         self.approved_payload = None
-        self.approved_file = None
 
-    # --------------------------------------------------
-    # PROCESS CHAT MESSAGE
-    # --------------------------------------------------
+        # Creation status
+        self.form_creation_in_progress = False
+        self.recruitment_metadata_saved = False
+        self.response_watch_created = False
+
+    # ========================================================
+    # RESET APPROVAL AND CREATION STATUS
+    # ========================================================
+
+    def reset_creation_status(self):
+
+        self.job_post_approved = False
+        self.application_form_approved = False
+
+        self.created_post_id = None
+        self.created_form_id = None
+        self.created_form_url = None
+
+        self.question_mapping = None
+        self.approved_payload = None
+
+        self.form_creation_in_progress = False
+        self.recruitment_metadata_saved = False
+        self.response_watch_created = False
+
+    # ========================================================
+    # PROCESS USER MESSAGE
+    # ========================================================
 
     def process_message(self, user_message):
 
-        if self.is_approved:
-
-            return {
-                "type": "error",
-                "message": (
-                    "This job post has already been approved. "
-                    "Please start a new job post."
-                )
-            }
-
-        if not isinstance(user_message, str) or not user_message.strip():
-
-            return {
-                "type": "error",
-                "message": "Please enter a message."
-            }
+        if not isinstance(user_message, str):
+            raise ValueError("Message must be text.")
 
         user_message = user_message.strip()
 
+        if not user_message:
+            raise ValueError("Message cannot be empty.")
+
+        # Save the user's message in conversation history.
         self.conversation.append({
             "role": "user",
             "content": user_message
         })
 
+        # Generate AI response.
         try:
 
             ai_response = generate_ai_response(
-                conversation=self.conversation,
-                current_job_post=self.current_job_post,
-                current_application_form=self.current_application_form
-            )
-
-            # ------------------------------------------
-            # NORMAL QUESTION
-            # ------------------------------------------
-
-            if ai_response.get("action") == "answer":
-
-                answer = ai_response.get(
-                    "answer",
-                    "I don't know the answer to that."
-                )
-
-                self.conversation.append({
-                    "role": "assistant",
-                    "content": answer
-                })
-
-                # IMPORTANT:
-                # Do not clear or overwrite the previously
-                # generated drafts when answering a question.
-
-                return {
-                    "type": "response",
-                    "data": {
-                        "action": "answer",
-                        "answer": answer
-                    }
-                }
-
-            # ------------------------------------------
-            # GENERATE OR MODIFY DRAFTS
-            # ------------------------------------------
-
-            if ai_response.get("action") == "draft":
-
-                job_post = prepare_job_post(
-                    ai_response.get("job_post", {})
-                )
-
-                application_form = prepare_application_form(
-                    ai_response.get("application_form", {})
-                )
-
-                self.current_job_post = job_post
-                self.current_application_form = application_form
-
-                self.is_approved = False
-                self.approved_payload = None
-                self.approved_file = None
-
-                assistant_message = ai_response.get(
-                    "message",
-                    "Both drafts have been generated successfully."
-                )
-
-                # Save a short assistant message.
-                # The complete latest drafts are passed separately
-                # to the AI on the next message.
-
-                self.conversation.append({
-                    "role": "assistant",
-                    "content": assistant_message
-                })
-
-                return {
-                    "type": "response",
-                    "data": {
-                        "action": "draft",
-                        "message": assistant_message,
-                        "job_post": job_post,
-                        "application_form": application_form
-                    }
-                }
-
-            raise ValueError(
-                "Unsupported AI response."
-            )
-
-        except Exception as error:
-
-            # Remove the failed user message from history.
-            if (
                 self.conversation
-                and self.conversation[-1].get("role") == "user"
-            ):
+            )
+
+        except Exception:
+            # Remove the message if AI generation failed.
+            self.conversation.pop()
+            raise
+
+        action = ai_response.get("action")
+
+        # ====================================================
+        # 1. NORMAL CONVERSATIONAL ANSWER
+        # ====================================================
+
+        if action == "answer":
+
+            answer = (
+                ai_response.get("answer")
+                or ai_response.get("message")
+            )
+
+            if not isinstance(answer, str) or not answer.strip():
+
                 self.conversation.pop()
 
-            print("CHAT SERVICE ERROR:", str(error))
+                raise ValueError(
+                    "AI returned an empty answer."
+                )
 
+            # Save AI response in conversation history.
+            self.conversation.append({
+                "role": "assistant",
+                "content": json.dumps(
+                    ai_response,
+                    ensure_ascii=False
+                )
+            })
+
+            # Do not clear existing drafts or approvals
+            # for an ordinary conversational question.
             return {
-                "type": "error",
-                "message": str(error)
+                "action": "answer",
+                "answer": answer,
+                "message": answer
             }
 
-    # --------------------------------------------------
-    # UPDATE DRAFTS FROM FRONTEND JSON EDITOR
-    # --------------------------------------------------
+        # ====================================================
+        # 2. JOB POST AND APPLICATION FORM DRAFT
+        # ====================================================
 
-    def update_drafts(self, job_post, application_form):
+        if action == "draft":
 
-        if self.is_approved:
-
-            raise ValueError(
-                "Approved drafts cannot be edited."
+            job_post = prepare_job_post(
+                ai_response.get("job_post", {})
             )
 
-        if not isinstance(job_post, dict):
-
-            raise ValueError(
-                "Job post must be a JSON object."
+            application_form = prepare_application_form(
+                ai_response.get("application_form", {})
             )
 
-        if not isinstance(application_form, dict):
+            # Both drafts must be available.
+            if not job_post or not application_form:
 
-            raise ValueError(
-                "Application form must be a JSON object."
-            )
+                self.conversation.pop()
 
-        self.current_job_post = prepare_job_post(job_post)
+                raise ValueError(
+                    "AI did not generate both required drafts."
+                )
 
-        self.current_application_form = prepare_application_form(
-            application_form
+            if not job_post.get("job_description"):
+
+                self.conversation.pop()
+
+                raise ValueError(
+                    "Generated job description is empty."
+                )
+
+            if not application_form.get("questions"):
+
+                self.conversation.pop()
+
+                raise ValueError(
+                    "Generated application form has no questions."
+                )
+
+            # Store the newly generated drafts.
+            self.current_job_post = job_post
+
+            self.current_application_form = application_form
+
+            # Reset previous approval and creation details.
+            self.reset_creation_status()
+
+            # Save AI response in conversation history.
+            self.conversation.append({
+                "role": "assistant",
+                "content": json.dumps(
+                    ai_response,
+                    ensure_ascii=False
+                )
+            })
+
+            return {
+                "action": "draft",
+                "message": (
+                    ai_response.get("message")
+                    or (
+                        "Your job post and application "
+                        "form are ready for review."
+                    )
+                ),
+                "job_post": job_post,
+                "application_form": application_form,
+                "job_post_approved": False,
+                "application_form_approved": False
+            }
+
+        # ====================================================
+        # 3. UNSUPPORTED AI RESPONSE
+        # ====================================================
+
+        self.conversation.pop()
+
+        raise ValueError(
+            "AI returned an unsupported response action."
         )
 
-        self.is_approved = False
-        self.approved_payload = None
-        self.approved_file = None
-
-        # Record that the drafts were manually updated.
-        self.conversation.append({
-            "role": "assistant",
-            "content": (
-                "The current job post and application form "
-                "were updated through the JSON editor. "
-                "Use the latest saved drafts for future changes."
-            )
-        })
-
-        return {
-            "job_post": self.current_job_post,
-            "application_form": self.current_application_form
-        }
-
-    # --------------------------------------------------
-    # APPROVE FINAL DRAFTS
-    # --------------------------------------------------
-
-    def approve(self, job_post, application_form, payload, file_path):
-
-        if self.is_approved:
-
-            raise ValueError(
-                "This job post has already been approved."
-            )
-
-        if not isinstance(job_post, dict):
-
-            raise ValueError(
-                "Invalid job post."
-            )
-
-        if not isinstance(application_form, dict):
-
-            raise ValueError(
-                "Invalid application form."
-            )
-
-        self.current_job_post = job_post
-        self.current_application_form = application_form
-
-        self.approved_payload = payload
-        self.approved_file = file_path
-
-        self.is_approved = True
-
-        return {
-            "approved": True,
-            "approved_payload": self.approved_payload,
-            "saved_file": self.approved_file
-        }
-
-    # --------------------------------------------------
-    # RESET ACTIVE SESSION
-    # --------------------------------------------------
+    # ========================================================
+    # RESET CHAT SESSION
+    # ========================================================
 
     def reset(self):
 
         self.conversation = []
 
-        self.current_job_post = {}
-        self.current_application_form = {}
+        self.current_job_post = None
+        self.current_application_form = None
 
-        self.is_approved = False
-
-        self.approved_payload = None
-        self.approved_file = None
+        self.reset_creation_status()
