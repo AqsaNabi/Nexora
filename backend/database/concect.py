@@ -1,19 +1,21 @@
+
 import psycopg2
 from psycopg2.extras import RealDictCursor
+import os
+from dotenv import load_dotenv
+load_dotenv()
+DATABASE_URL = os.getenv("DATABASE_URL")
 
 try:
     conn = psycopg2.connect(
-        host="localhost",
-        user="postgres",
-        password="Salif@523186",
-        port="5432",
-        database="nexora",
-        cursor_factory=RealDictCursor 
+        DATABASE_URL,
+        cursor_factory=RealDictCursor,
+        sslmode="require"
     )
 
     cur = conn.cursor()
 
-    print("Connected to database PostgreSQL successfully!")
+    print("Connected to Render PostgreSQL successfully!")
 
 except psycopg2.Error as e:
     print(f"Database connection failed: {e}")
