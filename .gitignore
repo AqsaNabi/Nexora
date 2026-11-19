@@ -1,20 +1,23 @@
 # Environment variables
 .env
 .env.*
-
-# Allow example environment file
 !.env.example
 
 # Google OAuth credentials
 backend/authen/credentials.json
 backend/authen/token.json
-
+backend/authen/pubsub_credentials.json
 # Python cache
 __pycache__/
 *.py[cod]
 
 # Virtual environments
+env/
 venv/
+<<<<<<< HEAD
 .venv/
 env/
 backend/model/post_gen/generated_outputs/
+=======
+.venv/
+>>>>>>> main
