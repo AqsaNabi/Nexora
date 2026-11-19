@@ -14,4 +14,10 @@ __pycache__/
 # Virtual environments
 env/
 venv/
+<<<<<<< HEAD
 .venv/
+env/
+backend/model/post_gen/generated_outputs/
+=======
+.venv/
+>>>>>>> main
