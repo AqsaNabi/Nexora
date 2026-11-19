@@ -1,35 +1,35 @@
 import os
- 
+
 from dotenv import load_dotenv
 from openai import OpenAI
- 
+
 load_dotenv()
- 
- 
+
+
 # =====================================================
 # BEDROCK CLIENT
 # =====================================================
- 
+
 client = OpenAI(
     api_key=os.getenv("BEDROCK_API_KEY"),
     base_url=os.getenv("BEDROCK_BASE_URL")
 )
- 
- 
+
+
 # =====================================================
 # RAG LLM FUNCTION
 # =====================================================
- 
+
 def generate_answer(question: str, context: str):
- 
+
     model_id = os.getenv("BEDROCK_MODEL")
- 
+
     if not model_id:
         raise ValueError("BEDROCK_MODEL is missing in .env")
- 
+
     if not question or not question.strip():
         raise ValueError("Question cannot be empty.")
- 
+
     if not context or not context.strip():
         return (
             "I could not find relevant information "
