@@ -20,7 +20,10 @@ PROJECT_ID = os.getenv("GOOGLE_PROJECT_ID")
 REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI")
 
 SCOPES = [
-    "https://www.googleapis.com/auth/forms.body"
+    "https://www.googleapis.com/auth/forms.body",
+    "https://www.googleapis.com/auth/forms.responses.readonly",
+    "https://www.googleapis.com/auth/drive.file",
+    "https://www.googleapis.com/auth/drive.readonly"
 ]
 
 

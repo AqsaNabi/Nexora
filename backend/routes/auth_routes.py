@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import RedirectResponse
 
-from authen.google_oauth import (
+from backend.authen.google_oauth import (
     get_authorization_url,
     exchange_code_for_token
 )
