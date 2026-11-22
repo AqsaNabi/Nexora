@@ -2,7 +2,7 @@ from fastapi import APIRouter, Form, File, UploadFile, HTTPException
 from pydantic import EmailStr
 from datetime import date
 
-from services.register import register_employee_service
+from backend.services.register import register_employee_service
 
 router = APIRouter(
 )

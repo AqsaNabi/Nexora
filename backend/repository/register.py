@@ -1,4 +1,4 @@
-from database.concect import cur, conn
+from backend.database.concect import cur, conn
 import streamlit as st
 
 def create_employee(employee):

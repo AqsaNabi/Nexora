@@ -1,7 +1,7 @@
 
 from fastapi import APIRouter, Form, File, UploadFile,Depends
-from authen.auth import verify_token
-from services.policy import upload_policy
+from backend.authen.auth import verify_token
+from backend.services.policy import upload_policy
 
 router = APIRouter(
     prefix="/policies",

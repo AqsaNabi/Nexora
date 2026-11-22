@@ -1,5 +1,5 @@
 
-from database.concect import cur, conn
+from backend.database.concect import cur, conn
 
 
 def get_employee_by_email(email):
