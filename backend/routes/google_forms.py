@@ -1,10 +1,14 @@
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
-from backend.services.google_form_service import create_google_form_from_json #testing the scratch file
+
+from backend.services.google_form_service import create_google_form_from_json
+
+from backend.authen.auth import verify_token 
 router = APIRouter(
     prefix="/google-forms",
-    tags=["Google Forms"]
+    tags=["Google Forms"],
+    dependencies=[Depends(verify_token)]
 )
 
 

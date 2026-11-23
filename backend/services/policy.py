@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 from unstructured.partition.api import partition_via_api
 from unstructured.chunking.title import chunk_by_title
 
-from repository.policy import (
+from backend.repository.policy import (
     create_policy,
     create_policy_chunks
 )

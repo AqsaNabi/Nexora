@@ -1,4 +1,4 @@
-from repository.details import count_employee,show_employees
+from backend.repository.details import count_employee,show_employees
 def count_employees():
     return count_employee()
 def get_employee_details():

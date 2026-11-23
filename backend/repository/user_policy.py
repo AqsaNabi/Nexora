@@ -1,4 +1,4 @@
-from database.concect import conn
+from backend.database.concect import conn
 from psycopg2.extras import RealDictCursor
 def search_policy_chunks(
     question_embedding,

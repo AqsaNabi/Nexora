@@ -2,7 +2,7 @@ import uuid
 from datetime import date
 from fastapi import HTTPException
 
-from repository.register import create_employee
+from backend.repository.register import create_employee
 
 
 def register_employee_service(employee, image_data=None):

@@ -1,8 +1,8 @@
 from typing import Optional
 from fastapi import APIRouter, Depends
-from authen.auth import verify_token
+from backend.authen.auth import verify_token
 from pydantic import BaseModel
-from services.user_policy import ask_policy_question
+from backend.services.user_policy import ask_policy_question
 
 router = APIRouter(
     prefix="/user/policies",
