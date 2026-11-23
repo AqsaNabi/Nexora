@@ -42,8 +42,8 @@ def create_recruitment_post(job_title, job_description):
         row = cursor.fetchone()
         if row is None:
             raise RuntimeError("INSERT ... RETURNING post_id returned no row")
-        post_id = _get(row, "post_id")
-        connection.commit()
+        post_id = _get(row, "post_id")  # ✅ MUST BE THIS
+        connection.commit()             # ✅ MUST BE THIS
         return post_id
     except Exception as error:
         traceback.print_exc()
@@ -52,8 +52,6 @@ def create_recruitment_post(job_title, job_description):
             f"Failed to create recruitment post: "
             f"{type(error).__name__}: {error!r}"
         ) from error
-
-
 # ---------------------------------------------------------------- metadata
 
 def save_recruitment_metadata(

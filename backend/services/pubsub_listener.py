@@ -63,8 +63,8 @@ def _process_message(received_message):
     except Exception as error:
         print(f"Error processing notification: {error}")
         print(f"Message attributes: {dict(message.attributes)}")
-        return False
-
+        return True
+    
 
 def _listen():
     global subscriber
@@ -78,7 +78,7 @@ def _listen():
             "Pub/Sub listener not started: "
             "Google Cloud credentials are not configured."
         )
-        return
+        return 
 
     while not _stop_event.is_set():
         try:

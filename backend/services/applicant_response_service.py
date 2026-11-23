@@ -45,17 +45,21 @@ def _answer_value(answer):
 def _get_form_metadata(form_id):
     try:
         with connection.cursor() as local_cursor:
+            # Allow matching with or without the "forms/" prefix
             local_cursor.execute(
                 """
                 SELECT post_id, question_mapping
                 FROM recruitment_metadata
-                WHERE form_id = %s;
+                WHERE form_id = %s 
+                   OR form_id = %s
+                   OR form_id = %s;
                 """,
-                (form_id,)
+                (form_id, f"forms/{form_id}", form_id.replace("forms/", ""))
             )
             result = local_cursor.fetchone()
  
             if not result:
+                print(f"Database lookup failed for form_id: {form_id}")
                 raise ValueError(f"No recruitment post found for form {form_id}")
  
             # ✅ FIXED: Access dictionary keys properly instead of unpacking

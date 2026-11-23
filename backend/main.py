@@ -18,8 +18,8 @@ from backend.services.pubsub_listener import (
     stop_pubsub_listener
 )
 
-
-
+from backend.routes.detail_router import router as detail_router, ws_router as detail_ws
+from backend.routes.chat_router    import router as ats_router,    ws_router as ats_ws
 
 app = FastAPI()
 app.add_middleware(
@@ -29,14 +29,16 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
+app.include_router(detail_router)
+app.include_router(detail_ws)
+app.include_router(ats_router)
+app.include_router(ats_ws)
 app.include_router(register_router)
 app.include_router(login_router)
 app.include_router(details_router)
 app.include_router(announcements_router)
 app.include_router(policy_router)
 app.include_router(user_policy_router)
-app.include_router(ats_router)
 app.include_router(chat_router)
 app.include_router(auth_routes.router)
 app.include_router(google_form_router)
@@ -57,10 +59,3 @@ def startup_event():
 def shutdown_event():
     stop_pubsub_listener()
 
-
-@app.get("/health")
-def health():
-    return {
-        "status": "healthy",
-        "message": "Nexora chatbot backend is working"
-    }
