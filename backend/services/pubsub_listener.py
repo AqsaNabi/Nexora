@@ -1,9 +1,10 @@
-
 import json
+import os
 import threading
 import time
 
 from google.cloud import pubsub_v1
+from google.oauth2 import service_account
 from google.auth.exceptions import DefaultCredentialsError
 
 from backend.services.applicant_response_service import (
@@ -27,7 +28,19 @@ def _get_subscriber():
     global subscriber
 
     if subscriber is None:
-        subscriber = pubsub_v1.SubscriberClient()
+        # ✅ FIXED: Explicitly load the credentials from the Render secret file
+        # or local path.
+        creds_path = os.getenv(
+            "GOOGLE_APPLICATION_CREDENTIALS", 
+            "backend/authen/pubsub_credentials.json"
+        )
+        
+        if os.path.exists(creds_path):
+            credentials = service_account.Credentials.from_service_account_file(creds_path)
+            subscriber = pubsub_v1.SubscriberClient(credentials=credentials)
+        else:
+            # Fallback to default ADC if file isn't found
+            subscriber = pubsub_v1.SubscriberClient()
 
     return subscriber
 
