@@ -1,4 +1,3 @@
-
 import os
 import json
 from pathlib import Path
@@ -12,7 +11,13 @@ BASE_DIR = Path(__file__).resolve().parents[2]
 # Load environment variables from Nexora/.env
 load_dotenv(BASE_DIR / ".env")
 
-TOKEN_FILE = Path(__file__).resolve().parent / "token.json"
+# ✅ FIXED: Use Render path, fallback to local path
+TOKEN_FILE = Path(
+    os.getenv(
+        "GOOGLE_TOKEN_PATH", 
+        str(Path(__file__).resolve().parent / "token.json")
+    )
+)
 
 CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
@@ -65,6 +70,8 @@ def get_authorization_url():
     )
 
     return authorization_url, state, flow
+
+
 def exchange_code_for_token(code, flow):
     flow.fetch_token(code=code)
 
@@ -79,7 +86,11 @@ def exchange_code_for_token(code, flow):
         "scopes": credentials.scopes
     }
 
-    with open(TOKEN_FILE, "w", encoding="utf-8") as token_file:
-        json.dump(token_data, token_file, indent=4)
+    # ✅ FIXED: Catch write errors on read-only production filesystems
+    try:
+        with open(TOKEN_FILE, "w", encoding="utf-8") as token_file:
+            json.dump(token_data, token_file, indent=4)
+    except OSError:
+        pass
 
     return credentials
