@@ -103,3 +103,4 @@ xxhash==4.1.0
 zope.event==6.2
 zope.interface==8.7
 zstandard==0.25.0
+python-jose[cryptography]==3.5.0
