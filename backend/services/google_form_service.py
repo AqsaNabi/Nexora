@@ -1,4 +1,3 @@
-
 import json
 import os
 from pathlib import Path
@@ -13,7 +12,14 @@ from googleapiclient.discovery import build
 # ============================================================
 
 BASE_DIR = Path(__file__).resolve().parents[1]
-TOKEN_FILE = BASE_DIR / "authen" / "token.json"
+
+# ✅ FIXED: Use Render path, fallback to local path
+TOKEN_FILE = Path(
+    os.getenv(
+        "GOOGLE_TOKEN_PATH", 
+        str(BASE_DIR / "authen" / "token.json")
+    )
+)
 
 FORMS_SCOPE = [
     "https://www.googleapis.com/auth/forms.body",
@@ -63,10 +69,14 @@ def get_credentials():
 
         credentials.refresh(Request())
 
-        TOKEN_FILE.write_text(
-            credentials.to_json(),
-            encoding="utf-8"
-        )
+        # ✅ FIXED: Ignore write errors if running on a read-only filesystem (Render)
+        try:
+            TOKEN_FILE.write_text(
+                credentials.to_json(),
+                encoding="utf-8"
+            )
+        except OSError:
+            pass
 
     if not credentials.valid:
         raise ValueError(
