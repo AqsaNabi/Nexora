@@ -6,14 +6,14 @@ from dotenv import load_dotenv
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
-from model.announcement_agent import  generate_announcement, modify_announcement
+from backend.model.announcement_agent import  generate_announcement, modify_announcement
    
    
 
 
-from repository.announcement import save_announcement,fetch_latest_announcement
+from backend.repository.announcement import save_announcement,fetch_latest_announcement
 
-from database.concect import cur, conn
+from backend.database.concect import cur, conn
 
 load_dotenv()
 # ==========================================

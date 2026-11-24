@@ -1,12 +1,12 @@
 from fastapi import HTTPException
 from psycopg2.extras import Json  # ✅ Added missing import
 import traceback
- 
+
 from backend.database.concect import cur, conn
- 
+
 cursor = cur
 connection = conn
- 
+
 def _safe_rollback():
     try:
         if connection:
@@ -19,8 +19,8 @@ def _safe_rollback():
 # =========================================================
 def evaluate_candidate(resume_text, job_description):
     return {"candidate_score": None}
- 
- 
+
+
 # =========================================================
 # 2. GET DASHBOARD DATA
 # =========================================================
@@ -61,8 +61,8 @@ def get_dashboard_data():
         _safe_rollback()
         traceback.print_exc()
         raise e
- 
- 
+
+
 # =========================================================
 # 3. GET CANDIDATE APPLICATIONS
 # =========================================================
@@ -75,7 +75,6 @@ def get_applications_data(post_id: str):
  
         if selected_job is None:
             raise HTTPException(status_code=404, detail="Job posting not found")
- 
         cursor.execute("""
             SELECT
                 application_id, post_id, full_name, email, phone,
@@ -87,7 +86,6 @@ def get_applications_data(post_id: str):
             ORDER BY submitted_at DESC;
         """, (post_id,))
         selected_applications = cursor.fetchall()
- 
         for application in selected_applications:
             application["resume_file"] = None
  
@@ -99,8 +97,8 @@ def get_applications_data(post_id: str):
         _safe_rollback()
         traceback.print_exc()
         raise e
- 
- 
+
+
 # =========================================================
 # 4. SUBMIT NEW CANDIDATE APPLICATION
 # =========================================================
@@ -113,9 +111,9 @@ def submit_application_data(post_id: str, request):
  
         if selected_job is None:
             raise HTTPException(status_code=404, detail="Job posting not found")
- 
+
         evaluation = evaluate_candidate(request.resume_text, selected_job["job_description"])
- 
+
         cursor.execute("""
             INSERT INTO recruitment_data (
                 post_id, full_name, email, phone,
@@ -136,7 +134,6 @@ def submit_application_data(post_id: str, request):
  
         new_application = dict(cursor.fetchone())
         connection.commit()
- 
         new_application["resume_file"] = None
  
         return {
@@ -150,8 +147,8 @@ def submit_application_data(post_id: str, request):
         _safe_rollback()
         traceback.print_exc()
         raise
- 
- 
+
+
 # =========================================================
 # 5. GET CANDIDATE RESUME
 # =========================================================
@@ -166,10 +163,10 @@ def get_candidate_resume(application_id: int):
  
         if resume is None:
             raise HTTPException(status_code=404, detail="Candidate application not found")
- 
+
         if not resume["resume_file"]:
             raise HTTPException(status_code=404, detail="No resume has been added")
- 
+
         return dict(resume)
     except Exception as e:
         _safe_rollback()

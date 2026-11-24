@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel 
-from authen.auth import verify_token 
-from services.details import count_employees,get_employee_details
+from backend.authen.auth import verify_token 
+from backend.services.details import count_employees,get_employee_details
 
 router = APIRouter(dependencies=[Depends(verify_token)])
 

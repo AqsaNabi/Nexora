@@ -1,10 +1,9 @@
 
 from fastapi import APIRouter, HTTPException,Depends
-from authen.auth import verify_token 
+from backend.authen.auth import verify_token 
 from pydantic import BaseModel, Field
 
-from services.announcements import  create_announcement, update_announcement,approve_announcement,   reject_announcement,get_latest_announcement
-   
+from backend.services.announcements import  create_announcement, update_announcement,approve_announcement,   reject_announcement,get_latest_announcement
    
     
  

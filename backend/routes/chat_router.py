@@ -1,9 +1,14 @@
-
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    WebSocket,
+    WebSocketDisconnect,
+)
 from starlette.concurrency import run_in_threadpool
 
 from backend.services.chat_service import ChatService
-
+from backend.authen.auth import verify_token, SECRET_KEY, ALGORITHM
 from backend.services.google_form_service import (
     create_google_form_from_json
 )
@@ -23,13 +28,67 @@ from backend.repository.recruitment_repository import (
 )
 
 
-router = APIRouter()
+# ------------------------------------------------------------
+# HTTP router (kept exactly as before) — applies Depends(verify_token)
+# to every *HTTP* route registered on it. It is NOT used for WebSockets.
+# ------------------------------------------------------------
+router = APIRouter(dependencies=[Depends(verify_token)])
+
+
+# ------------------------------------------------------------
+# WebSocket router — NO router-level Depends(verify_token).
+# Auth is done manually inside each WS handler via verify_token_ws.
+# ------------------------------------------------------------
+ws_router = APIRouter()
+
+
+# ------------------------------------------------------------
+# WebSocket-specific JWT verifier.
+#
+# HTTPBearer (used by verify_token) can only read the Authorization
+# header, and browsers cannot send that on new WebSocket(...).
+# So on WS we read the token from the query string:  ?token=<jwt>
+# It uses the SAME SECRET_KEY / ALGORITHM as your friend's file,
+# so tokens minted by create_token work here unchanged.
+# ------------------------------------------------------------
+def verify_token_ws(websocket: WebSocket) -> str:
+    from jose import jwt, JWTError
+
+    token = websocket.query_params.get("token")
+
+    if not token:
+        raise HTTPException(status_code=401, detail="Missing token")
+
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        email = payload.get("sub")
+        if not email:
+            raise HTTPException(
+                status_code=401, detail="Token missing subject"
+            )
+        return email
+
+    except JWTError:
+        raise HTTPException(
+            status_code=401, detail="Invalid or expired token"
+        )
+
+
 active_sessions = {}
 
 
-@router.websocket("/ws/chat/{session_id}")
+@ws_router.websocket("/ws/chat/{session_id}")
 async def chat_websocket(websocket: WebSocket, session_id: str):
 
+    # ---- AUTH FIRST (before accept) ----
+    try:
+        verify_token_ws(websocket)
+    except HTTPException:
+        # 1008 = policy violation. Must close *before* accept().
+        await websocket.close(code=1008)
+        return
+
+    # ---- Only now accept ----
     await websocket.accept()
 
     if session_id not in active_sessions:
@@ -157,6 +216,17 @@ async def chat_websocket(websocket: WebSocket, session_id: str):
                     job_description
                 )
 
+                # ✅ ADD THIS SAFETY CHECK
+                if not chat_service.created_post_id:
+                    raise Exception(
+                        "Database failed to return a valid post_id. "
+                        "Check backend logs."
+                    )
+
+                print(
+                    "✅ Successfully created post in database: "
+                    f"{chat_service.created_post_id}"
+                )
             # ------------------------------------------------
             # STEP 2: CREATE GOOGLE FORM
             # ------------------------------------------------

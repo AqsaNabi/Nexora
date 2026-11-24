@@ -1,10 +1,10 @@
 
-from database.concect import conn, cur
+from backend.database.concect import conn, cur
 from psycopg2 import Binary
 from psycopg2.extras import Json
 from pgvector.psycopg2 import register_vector
 
-from model.policy_embed import embedding_model
+from backend.model.policy_embed import embedding_model
 
 
 # Register pgvector

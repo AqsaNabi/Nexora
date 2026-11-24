@@ -1,7 +1,7 @@
-from model.policy_embed import embedding_model
-from model.policy_llm import generate_answer
+from backend.model.policy_embed import embedding_model
+from backend.model.policy_llm import generate_answer
 
-from repository.user_policy import search_policy_chunks
+from backend.repository.user_policy import search_policy_chunks
 
 
 # =====================================================
