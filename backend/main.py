@@ -1,4 +1,5 @@
 
+ 
 from fastapi import FastAPI
 
 from backend.routes.login import router as login_router
@@ -20,6 +21,8 @@ from backend.services.pubsub_listener import (
 
 from backend.routes.detail_router import router as detail_router, ws_router as detail_ws
 from backend.routes.chat_router    import router as ats_router,    ws_router as ats_ws
+from backend.routes.detail_router import resume_router
+ 
 
 app = FastAPI()
 app.add_middleware(
@@ -42,7 +45,7 @@ app.include_router(user_policy_router)
 app.include_router(chat_router)
 app.include_router(auth_routes.router)
 app.include_router(google_form_router)
-
+app.include_router(resume_router)
 @app.get("/")
 def home():
 
