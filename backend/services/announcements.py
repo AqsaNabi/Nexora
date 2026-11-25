@@ -1,35 +1,37 @@
 
 import os
-import smtplib
+import requests
 from dotenv import load_dotenv
 
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+from model.announcement_agent import (
+    generate_announcement,
+    modify_announcement
+)
 
-from backend.model.announcement_agent import  generate_announcement, modify_announcement
-   
-   
+from repository.announcement import (
+    save_announcement,
+    fetch_latest_announcement
+)
 
-
-from backend.repository.announcement import save_announcement,fetch_latest_announcement
-
-from backend.database.concect import cur, conn
+from database.concect import cur, conn
 
 load_dotenv()
+
+
 # ==========================================
-# EMAIL CONFIGURATION
+# BREVO EMAIL CONFIGURATION
 # ==========================================
 
-# Use your complete Gmail address
+BREVO_API_URL = os.getenv("BREVO_API_URL")
+
+BREVO_API_KEY = os.getenv("BREVO_API_KEY")
+
 sender_email = os.getenv("EMAIL_ADDRESS")
 
-
-# Use your NEW Google App Password
-sender_password = os.getenv("EMAIL_PASSWORD")
-
-smtp_server=os.getenv("SMTP_SERVER")
-
-smtp_port = os.getenv("SMTP_PORT")
+sender_name = os.getenv(
+    "EMAIL_SENDER_NAME",
+    "Nexora HR"
+)
 
 
 # ==========================================
@@ -37,14 +39,9 @@ smtp_port = os.getenv("SMTP_PORT")
 # ==========================================
 
 ALLOWED_DESIGNATIONS = [
-
     "Manager",
-
     "Team Lead",
-
-    "Employee",
-
-
+    "Employee"
 ]
 
 
@@ -67,13 +64,7 @@ def validate_designation(designation):
 # GENERATE ANNOUNCEMENT
 # ==========================================
 
-def create_announcement(
-
-    designation,
-
-    prompt
-
-):
+def create_announcement(designation, prompt):
 
     validate_designation(designation)
 
@@ -83,27 +74,17 @@ def create_announcement(
             "Prompt cannot be empty."
         )
 
-    # Generate announcement using AI
     announcement = generate_announcement(
-
         prompt=prompt,
-
         designation=designation
-
     )
 
     return {
-
         "designation": designation,
-
         "announcement": announcement,
-
         "status": "pending",
-
         "saved": False,
-
         "email_sent": False
-
     }
 
 
@@ -112,52 +93,43 @@ def create_announcement(
 # ==========================================
 
 def update_announcement(
-
     designation,
-
     existing_announcement,
-
     modification_prompt
-
 ):
 
     validate_designation(designation)
 
-    if not existing_announcement or not existing_announcement.strip():
+    if (
+        not existing_announcement
+        or not existing_announcement.strip()
+    ):
 
         raise ValueError(
             "Existing announcement cannot be empty."
         )
 
-    if not modification_prompt or not modification_prompt.strip():
+    if (
+        not modification_prompt
+        or not modification_prompt.strip()
+    ):
 
         raise ValueError(
             "Modification prompt cannot be empty."
         )
 
-    # Modify announcement using AI
     revised_announcement = modify_announcement(
-
         announcement=existing_announcement,
-
         modification_prompt=modification_prompt,
-
         designation=designation
-
     )
 
     return {
-
         "designation": designation,
-
         "announcement": revised_announcement,
-
         "status": "pending",
-
         "saved": False,
-
         "email_sent": False
-
     }
 
 
@@ -166,13 +138,9 @@ def update_announcement(
 # ==========================================
 
 def reject_announcement(
-
     designation,
-
     title,
-
     announcement
-
 ):
 
     validate_designation(designation)
@@ -180,21 +148,14 @@ def reject_announcement(
     print("\n========== REJECT ANNOUNCEMENT ==========")
 
     print("Designation:", designation)
-
     print("Title:", title)
-
     print("Announcement rejected successfully")
 
     return {
-
         "status": "rejected",
-
         "message": "Announcement rejected successfully",
-
         "designation": designation,
-
         "title": title
-
     }
 
 
@@ -215,14 +176,10 @@ def get_recipients(designation):
         if designation == "Employee":
 
             query = """
-
                 SELECT full_name, email
                 FROM register
-            WHERE email IS NOT NULL
-              AND designation <> 'hr';
-
-                
-
+                WHERE email IS NOT NULL
+                  AND designation <> 'hr';
             """
 
             cur.execute(query)
@@ -234,26 +191,15 @@ def get_recipients(designation):
         elif designation == "Manager":
 
             query = """
-
                 SELECT full_name, email
-
                 FROM register
-
                 WHERE LOWER(TRIM(designation))
-
                 IN (
-
                     'manager',
                     'Manager',
-
                     'managers'
-
                 )
-
-                AND email IS NOT NULL
-
-                
-
+                AND email IS NOT NULL;
             """
 
             cur.execute(query)
@@ -265,35 +211,22 @@ def get_recipients(designation):
         elif designation == "Team Lead":
 
             query = """
-
                 SELECT full_name, email
-
                 FROM register
-
                 WHERE LOWER(TRIM(designation))
-
                 IN (
-
                     'team leader',
-
                     'team leaders',
-
                     'tl',
-
                     'tls'
-
                 )
-
-                AND email IS NOT NULL
-
-                
-
+                AND email IS NOT NULL;
             """
 
             cur.execute(query)
 
         # -------------------------------------
-        # FETCH EMPLOYEES
+        # FETCH RECIPIENTS
         # -------------------------------------
 
         recipients = cur.fetchall()
@@ -316,19 +249,14 @@ def get_recipients(designation):
 
 
 # ==========================================
-# SEND ANNOUNCEMENT EMAIL
+# SEND ANNOUNCEMENT EMAIL USING BREVO
 # ==========================================
 
 def send_announcement_email(
-
     recipient_name,
-
     recipient_email,
-
     title,
-
     announcement
-
 ):
 
     # ======================================
@@ -336,7 +264,6 @@ def send_announcement_email(
     # ======================================
 
     body = f"""
-
 Dear {recipient_name},
 
 {announcement}
@@ -344,100 +271,93 @@ Dear {recipient_name},
 Regards,
 
 HR Department
-
 """
 
     # ======================================
-    # CREATE EMAIL MESSAGE
+    # VALIDATE BREVO CONFIGURATION
     # ======================================
 
-    message = MIMEMultipart()
+    if not BREVO_API_KEY:
 
-    message["From"] = sender_email
-
-    message["To"] = recipient_email
-
-    message["Subject"] = title
-
-    message.attach(
-
-        MIMEText(
-
-            body,
-
-            "plain"
-
+        raise ValueError(
+            "BREVO_API_KEY is missing from environment variables."
         )
 
-    )
+    if not sender_email:
+
+        raise ValueError(
+            "EMAIL_ADDRESS is missing from environment variables."
+        )
 
     # ======================================
-    # SEND EMAIL
+    # CREATE BREVO PAYLOAD
     # ======================================
 
-    server = None
+    payload = {
+        "sender": {
+            "name": sender_name,
+            "email": sender_email
+        },
+        "to": [
+            {
+                "email": recipient_email,
+                "name": recipient_name
+            }
+        ],
+        "subject": title,
+        "textContent": body
+    }
+
+    headers = {
+        "accept": "application/json",
+        "api-key": BREVO_API_KEY,
+        "content-type": "application/json"
+    }
+
+    # ======================================
+    # SEND EMAIL THROUGH BREVO API
+    # ======================================
 
     try:
 
         print(
-            "\nConnecting to Gmail SMTP server..."
+            f"Sending announcement email to "
+            f"{recipient_email} through Brevo..."
         )
 
-        server = smtplib.SMTP(
-
-            smtp_server,
-
-            smtp_port,
-
+        response = requests.post(
+            BREVO_API_URL,
+            headers=headers,
+            json=payload,
             timeout=30
-
         )
 
-        # Secure connection
-        server.starttls()
+        response.raise_for_status()
 
-        print("Logging into Gmail...")
-
-        # Login using Gmail and App Password
-        server.login(
-
-            sender_email,
-
-            sender_password
-
-        )
-
-        print("Sending email...")
-
-        # Send email
-        server.send_message(message)
+        response_data = response.json()
 
         print(
-            f"Email sent successfully to {recipient_email}"
+            f"Brevo accepted email for {recipient_email}. "
+            f"Message ID: "
+            f"{response_data.get('messageId', 'not returned')}"
         )
 
         return True
 
-    except Exception as error:
+    except requests.exceptions.RequestException as error:
+
+        response_text = ""
+
+        if error.response is not None:
+
+            response_text = error.response.text
 
         print(
             f"Email sending failed for {recipient_email}: "
-            f"{repr(error)}"
+            f"{repr(error)} {response_text}"
         )
 
         raise
-
-    finally:
-
-        if server is not None:
-
-            try:
-
-                server.quit()
-
-            except Exception:
-
-                pass
 
 
 # ==========================================
@@ -445,13 +365,9 @@ HR Department
 # ==========================================
 
 def approve_announcement(
-
     designation,
-
     title,
-
     announcement
-
 ):
 
     validate_designation(designation)
@@ -473,21 +389,15 @@ def approve_announcement(
     # ======================================
 
     announcement_id = save_announcement(
-
         designation=designation,
-
         title=title,
-
         announcement=announcement
-
     )
 
     print("\n========== APPROVE ==========")
 
     print("Designation:", designation)
-
     print("Title:", title)
-
     print("Announcement saved successfully")
 
     # ======================================
@@ -495,9 +405,7 @@ def approve_announcement(
     # ======================================
 
     recipients = get_recipients(
-
         designation=designation
-
     )
 
     print(
@@ -510,50 +418,36 @@ def approve_announcement(
     # ======================================
 
     successful_emails = []
-
     failed_emails = []
 
     for recipient in recipients:
 
         recipient_name = recipient["full_name"]
-
         recipient_email = recipient["email"]
 
         try:
 
             send_announcement_email(
-
                 recipient_name=recipient_name,
-
                 recipient_email=recipient_email,
-
                 title=title,
-
                 announcement=announcement
-
             )
 
             successful_emails.append(
-
                 recipient_email
-
             )
 
         except Exception as error:
 
             print(
-
                 f"Email failed for {recipient_email}: "
                 f"{repr(error)}"
-
             )
 
             failed_emails.append({
-
                 "email": recipient_email,
-
                 "error": str(error)
-
             })
 
     # ======================================
@@ -584,36 +478,30 @@ def approve_announcement(
     # ======================================
 
     return {
-
         "status": "approved",
-
         "announcement_id": announcement_id,
-
         "designation": designation,
-
         "title": title,
-
         "announcement": announcement,
-
         "total_recipients": len(recipients),
-
         "emails_sent": len(successful_emails),
-
         "emails_failed": len(failed_emails),
-
         "failed_emails": failed_emails,
-
         "saved": True
-
     }
+
+
 # ==========================================
-# Get Latest Announcement
+# GET LATEST ANNOUNCEMENT
 # ==========================================
 
 def get_latest_announcement(designation: str):
 
     if not designation or not designation.strip():
-        raise ValueError("Designation cannot be empty.")
+
+        raise ValueError(
+            "Designation cannot be empty."
+        )
 
     designation = designation.strip()
 
@@ -622,10 +510,13 @@ def get_latest_announcement(designation: str):
     )
 
     if not result:
+
         return {
             "designation": designation,
             "announcement": None,
-            "message": "No announcements found for this designation."
+            "message": (
+                "No announcements found for this designation."
+            )
         }
 
     return result
