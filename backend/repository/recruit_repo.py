@@ -50,8 +50,9 @@ def get_dashboard_data():
             SELECT COUNT(*) AS total_applicants
             FROM recruitment_data;
         """)
-        total_applicants = cursor.fetchone()["total_applicants"]
-
+        # ✅ FIXED: Safely handle if fetchone() returns None
+        row = cursor.fetchone()
+        total_applicants = row["total_applicants"] if row else 0
         return {
             "jobs": combined_jobs,
             "total_jobs": len(combined_jobs),
