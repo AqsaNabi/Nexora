@@ -111,15 +111,11 @@ ats_manager = ATSConnectionManager()
 # 3. ATS WEBSOCKET ENDPOINT  (now on ws_router)
 # =========================================================
 
-# =========================================================
-# 3. ATS WEBSOCKET ENDPOINT  (now on ws_router)
-# =========================================================
-
 @ws_router.websocket("/ws/ats/notifications")
 async def ats_notifications(websocket: WebSocket):
+
     # ---- AUTH FIRST (before accept) ----
     try:
-        # ✅ Uses the query-param based JWT verifier
         verify_token_ws(websocket)
     except HTTPException:
         # 1008 = policy violation. Must close *before* accept().
@@ -128,7 +124,17 @@ async def ats_notifications(websocket: WebSocket):
 
     # ---- Only now accept ----
     await ats_manager.connect(websocket)
-    # ... rest of the code
+
+    try:
+
+        while True:
+
+            await websocket.receive_text()
+
+    except WebSocketDisconnect:
+
+        ats_manager.disconnect(websocket)
+
 
 # =========================================================
 # 4. APPLICATION REQUEST MODEL
