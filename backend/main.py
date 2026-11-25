@@ -45,7 +45,6 @@ app.include_router(user_policy_router)
 app.include_router(chat_router)
 app.include_router(auth_routes.router)
 app.include_router(google_form_router)
-app.include_router(resume_router)
 @app.get("/")
 def home():
 
