@@ -62,7 +62,6 @@ def _get_form_metadata(form_id):
                 print(f"Database lookup failed for form_id: {form_id}")
                 raise ValueError(f"No recruitment post found for form {form_id}")
  
-            # ✅ FIXED: Access dictionary keys properly instead of unpacking
             post_id = _get(result, "post_id")
             question_mapping = _get(result, "question_mapping")
  
@@ -108,38 +107,47 @@ def _save_applicant(form_id, response, post_id, question_mapping):
     if not applicant["full_name"] or not applicant["email"]:
         raise ValueError(f"Required applicant details missing: {response_id}")
  
-    # ✅ RESTORED: Enforce resume link
-    if not resume_link:
-        raise ValueError(f"Resume link missing for response {response_id}")
- 
     # Get the job description.
     job_description = get_job_description(post_id)
     if not job_description:
-        raise ValueError(f"Job description not found for post {post_id}")
- 
-    # Download resume from Google Drive.
-    resume_content, resume_filename, resume_content_type = (
-        download_resume_from_drive(resume_link)
-    )
-    if not resume_content:
-        raise ValueError(f"Could not download resume for {applicant['email']}")
- 
-    # Extract resume text.
-    resume_text = extract_resume_text(
-        resume_content,
-        resume_filename,
-        resume_content_type
-    )
-    if not resume_text:
-        raise ValueError(f"Could not extract resume text for {applicant['email']}")
- 
-    # Evaluate candidate using Bedrock.
-    candidate_score = evaluate_candidate(
-        job_description=job_description,
-        resume_text=resume_text,
-        application_answers=additional_data
-    )
- 
+        job_description = "No description provided."
+
+    # ---------------------------------------------------------
+    # ✅ SAFE RESUME PROCESSING (Won't crash if file is private)
+    # ---------------------------------------------------------
+    resume_content = None
+    resume_filename = None
+    resume_content_type = None
+    resume_text = "No resume provided"
+    candidate_score = None
+
+    if resume_link:
+        try:
+            resume_content, resume_filename, resume_content_type = (
+                download_resume_from_drive(resume_link)
+            )
+            if resume_content:
+                resume_text = extract_resume_text(
+                    resume_content, 
+                    resume_filename, 
+                    resume_content_type
+                )
+        except Exception as e:
+            print(f"⚠️ Could not process resume for {applicant['email']}: {e}")
+
+    if resume_text and resume_text != "No resume provided":
+        try:
+            candidate_score = evaluate_candidate(
+                job_description=job_description,
+                resume_text=resume_text,
+                application_answers=additional_data
+            )
+        except Exception as e:
+            print(f"⚠️ AI Evaluation failed for {applicant['email']}: {e}")
+
+    # ---------------------------------------------------------
+    # SAVE TO DATABASE
+    # ---------------------------------------------------------
     try:
         with connection.cursor() as local_cursor:
             # Prevent duplicate processing
@@ -189,11 +197,12 @@ def _save_applicant(form_id, response, post_id, question_mapping):
                 )
             )
         connection.commit()
-        print(f"Applicant saved: {applicant['email']} | Score: {candidate_score}")
+        print(f"✅ Applicant saved: {applicant['email']} | Score: {candidate_score}")
         return True
  
-    except Exception:
+    except Exception as e:
         connection.rollback()
+        print(f"❌ Database error saving applicant: {e}")
         raise
  
  
