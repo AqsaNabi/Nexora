@@ -21,7 +21,7 @@ from backend.services.pubsub_listener import (
 
 from backend.routes.detail_router import router as detail_router, ws_router as detail_ws
 from backend.routes.chat_router    import router as ats_router,    ws_router as ats_ws
-from backend.routes.detail_router import resume_router
+
  
 
 app = FastAPI()
