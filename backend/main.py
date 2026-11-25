@@ -34,7 +34,6 @@ app.add_middleware(
 )
 app.include_router(detail_router)
 app.include_router(detail_ws)
-app.include_router(ats_router)
 app.include_router(ats_ws_router)
 app.include_router(register_router)
 app.include_router(login_router)
