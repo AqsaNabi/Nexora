@@ -3,15 +3,11 @@ import os
 import requests
 from dotenv import load_dotenv
 
-from model.announcement_agent import (
-    generate_announcement,
-    modify_announcement
-)
+from model.announcement_agent import  generate_announcement,modify_announcement
 
-from repository.announcement import (
-    save_announcement,
-    fetch_latest_announcement
-)
+
+from repository.announcement import save_announcement,fetch_latest_announcement
+
 
 from database.concect import cur, conn
 
